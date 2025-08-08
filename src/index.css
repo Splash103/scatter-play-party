@@ -38,6 +38,11 @@ All colors MUST be HSL.
 
     --radius: 0.5rem;
 
+    /* Enhanced design tokens */
+    --gradient-hero: linear-gradient(135deg, hsl(var(--primary) / 0.06), hsl(var(--accent) / 0.35));
+    --shadow-elegant: 0 20px 50px -20px hsl(var(--primary) / 0.35);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
     --sidebar-background: 0 0% 98%;
 
     --sidebar-foreground: 240 5.3% 26.1%;

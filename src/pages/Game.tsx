@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,15 @@ const Game = () => {
   const [letter, setLetter] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const total = DEFAULT_CATEGORIES.length;
+
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+const roomCode: string | null = ((searchParams.get("room") || "").toUpperCase()) || null;
+
+  const leaveRoom = () => {
+    navigate("/");
+    toast({ title: "Left room", description: "You returned to the main menu." });
+  };
 
   const progress = useMemo(() => {
     if (!running || timer === 0) return 0;
@@ -83,9 +93,17 @@ const Game = () => {
         <link rel="canonical" href="/game" />
       </Helmet>
       <main className="container mx-auto py-8">
-        <header className="mb-6">
-          <h1 className="text-3xl font-bold tracking-tight">Scattergories Online — Solo</h1>
-          <p className="text-muted-foreground mt-1">12 categories • one letter • beat the clock</p>
+<header className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Scattergories Online — {roomCode ? "Room" : "Solo"}</h1>
+            <p className="text-muted-foreground mt-1">12 categories • one letter • beat the clock</p>
+          </div>
+          {roomCode && (
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border px-3 py-1 text-sm">Room {roomCode}</span>
+              <Button variant="secondary" onClick={leaveRoom}>Leave Room</Button>
+            </div>
+          )}
         </header>
 
         <section className="grid gap-6 md:grid-cols-[1fr,360px]">

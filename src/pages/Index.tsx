@@ -4,7 +4,9 @@ import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { gradientFromString, initialsFromName } from "@/lib/gradient";
 const ROOM_ALPHABET = "ABCDEFGHJKMNPQRSTWXYZ";
 function generateRoomCode(len = 4) {
   let out = "";
@@ -14,6 +16,8 @@ function generateRoomCode(len = 4) {
 
 const Index = () => {
   const [joinCode, setJoinCode] = useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [name, setName] = useState<string>(() => localStorage.getItem("profileName") || "");
   const navigate = useNavigate();
 
   const createRoom = () => {
@@ -32,6 +36,16 @@ const Index = () => {
     navigate(`/game?room=${code}`);
   };
 
+  const saveProfile = () => {
+    const n = name.trim();
+    if (!n) {
+      toast({ title: "Name required", description: "Please enter your display name." });
+      return;
+    }
+    localStorage.setItem("profileName", n);
+    toast({ title: "Profile saved", description: `Welcome, ${n}!` });
+    setProfileOpen(false);
+  };
   return (
     <>
       <Helmet>
@@ -47,7 +61,7 @@ const Index = () => {
           <h1 className="text-4xl font-bold mb-3">Play Scattergories Online</h1>
           <p className="text-lg text-muted-foreground mb-8">Fast rounds, random letters, and a beautiful experience. Multiplayer coming live with rooms.</p>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-center sm:items-center mb-8">
+<div className="flex flex-col gap-3 sm:flex-row sm:justify-center sm:items-center mb-6">
             <Button onClick={createRoom}>Create Room</Button>
             <div className="flex items-center gap-2 w-full sm:w-auto justify-center">
               <Input
@@ -59,6 +73,43 @@ const Index = () => {
               <Button variant="secondary" onClick={joinRoom}>Join</Button>
             </div>
           </div>
+
+          <div className="mt-2 flex items-center justify-center">
+            {name ? (
+              <div className="flex items-center gap-3">
+                <Avatar>
+                  <AvatarFallback
+                    style={{ backgroundImage: gradientFromString(name), color: "white" }}
+                  >
+                    {initialsFromName(name)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-sm">Playing as <span className="font-medium">{name}</span></span>
+                <Button variant="secondary" onClick={() => setProfileOpen(true)}>Edit profile</Button>
+              </div>
+            ) : (
+              <Button variant="secondary" onClick={() => setProfileOpen(true)}>Create your profile</Button>
+            )}
+          </div>
+
+          <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create your profile</DialogTitle>
+              </DialogHeader>
+              <div className="flex items-center gap-3">
+                <Avatar>
+                  <AvatarFallback
+                    style={{ backgroundImage: gradientFromString(name || 'Player'), color: "white" }}
+                  >
+                    {initialsFromName(name || 'P')}
+                  </AvatarFallback>
+                </Avatar>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your display name" />
+                <Button onClick={saveProfile}>Save</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           <div className="opacity-90">
             <Button asChild>

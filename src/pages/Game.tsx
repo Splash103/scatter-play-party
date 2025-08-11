@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
-
+import { supabase } from "@/integrations/supabase/client";
+import { ChatPanel, ChatMessage } from "@/components/ChatPanel";
+import { ResultsOverlay, PlayerResult } from "@/components/ResultsOverlay";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { gradientFromString, initialsFromName } from "@/lib/gradient";
 const DEFAULT_CATEGORIES = [
   "Fruits",
   "Countries",
@@ -42,13 +46,28 @@ const Game = () => {
 
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-const roomCode: string | null = ((searchParams.get("room") || "").toUpperCase()) || null;
+  const roomCode: string | null = ((searchParams.get("room") || "").toUpperCase()) || null;
+
+  const initialName = (typeof window !== 'undefined' ? localStorage.getItem('profileName') : '') || 'Player';
+  const [profileName] = useState<string>(initialName);
+  const [playerId] = useState<string>(() => {
+    const existing = typeof window !== 'undefined' ? localStorage.getItem('playerId') : null;
+    if (existing) return existing;
+    const id = (crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2));
+    if (typeof window !== 'undefined') localStorage.setItem('playerId', id);
+    return id;
+  });
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [presentCount, setPresentCount] = useState<number>(1);
+  const [results, setResults] = useState<Record<string, PlayerResult>>({});
+  const [votes, setVotes] = useState<Record<string, string[]>>({});
+  const [showResults, setShowResults] = useState(false);
 
   const leaveRoom = () => {
     navigate("/");
     toast({ title: "Left room", description: "You returned to the main menu." });
   };
-
   const progress = useMemo(() => {
     if (!running || timer === 0) return 0;
     return Math.min(100, ((timer - timeLeft) / timer) * 100);

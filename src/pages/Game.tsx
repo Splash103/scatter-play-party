@@ -60,6 +60,7 @@ const Game = () => {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [presentCount, setPresentCount] = useState<number>(1);
+  const [players, setPlayers] = useState<{ id: string; name: string }[]>([]);
   const [results, setResults] = useState<Record<string, PlayerResult>>({});
   const [votes, setVotes] = useState<Record<string, string[]>>({});
   const [showResults, setShowResults] = useState(false);
@@ -80,6 +81,13 @@ const Game = () => {
         if (t <= 1) {
           clearInterval(id);
           setRunning(false);
+          const r: PlayerResult = { playerId, name: profileName, letter, answers } as PlayerResult;
+          setResults((prev) => ({ ...prev, [playerId]: r }));
+          if (roomCode && channelRef.current) {
+            channelRef.current.send({ type: "broadcast", event: "round_submit", payload: r });
+            channelRef.current.send({ type: "broadcast", event: "round_end", payload: {} });
+          }
+          setShowResults(true);
           toast({ title: "Time's up!", description: "Review and submit your answers." });
           return 0;
         }
@@ -87,7 +95,61 @@ const Game = () => {
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [running]);
+  }, [running, roomCode, playerId, profileName, letter, answers]);
+
+  useEffect(() => {
+    if (!roomCode) return;
+    const channel = supabase.channel(`room_${roomCode}`, { config: { presence: { key: playerId } } });
+    channelRef.current = channel;
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState() as Record<string, { id: string; name: string }[]>;
+        const list = Object.entries(state).map(([key, presences]) => ({ id: key, name: presences?.[0]?.name || 'Player' }));
+        setPlayers(list);
+        setPresentCount(list.length || 1);
+      })
+      .on('broadcast', { event: 'chat' }, ({ payload }) => {
+        setMessages((m) => [...m, payload as ChatMessage].slice(-200));
+      })
+      .on('broadcast', { event: 'round_start' }, ({ payload }) => {
+        const p = payload as { letter: string; timer: number };
+        setLetter(p.letter);
+        setAnswers({});
+        setTimeLeft(p.timer);
+        setRunning(true);
+        setResults({});
+        setVotes({});
+        setShowResults(false);
+        toast({ title: "Round started", description: `Letter: ${p.letter} • ${p.timer} seconds` });
+      })
+      .on('broadcast', { event: 'round_submit' }, ({ payload }) => {
+        const r = payload as PlayerResult;
+        setResults((prev) => ({ ...prev, [r.playerId]: r }));
+      })
+      .on('broadcast', { event: 'round_end' }, () => {
+        setShowResults(true);
+      })
+      .on('broadcast', { event: 'vote' }, ({ payload }) => {
+        const { key, voterId } = payload as { key: string; voterId: string };
+        setVotes((prev) => {
+          const set = new Set([...(prev[key] || [])]);
+          set.add(voterId);
+          return { ...prev, [key]: Array.from(set) };
+        });
+      });
+
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await channel.track({ id: playerId, name: profileName, online_at: new Date().toISOString() });
+      }
+    });
+
+    return () => {
+      supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
+  }, [roomCode, playerId, profileName]);
 
   const startRound = () => {
     const l = randomLetter();
@@ -95,11 +157,23 @@ const Game = () => {
     setAnswers({});
     setTimeLeft(timer);
     setRunning(true);
+    setResults({});
+    setVotes({});
+    setShowResults(false);
     toast({ title: "Round started", description: `Letter: ${l} • ${timer} seconds` });
+    if (roomCode && channelRef.current) {
+      channelRef.current.send({ type: 'broadcast', event: 'round_start', payload: { letter: l, timer } });
+    }
   };
-
   const submitRound = () => {
     setRunning(false);
+    const r: PlayerResult = { playerId, name: profileName, letter, answers } as PlayerResult;
+    setResults((prev) => ({ ...prev, [playerId]: r }));
+    if (roomCode && channelRef.current) {
+      channelRef.current.send({ type: 'broadcast', event: 'round_submit', payload: r });
+      channelRef.current.send({ type: 'broadcast', event: 'round_end', payload: {} });
+    }
+    setShowResults(true);
     const score = Object.values(answers).filter((a) => a && a.trim().length > 0).length;
     toast({ title: "Round submitted", description: `You filled ${score}/${total} categories.` });
   };
@@ -118,8 +192,17 @@ const Game = () => {
             <p className="text-muted-foreground mt-1">12 categories • one letter • beat the clock</p>
           </div>
           {roomCode && (
-            <div className="flex items-center gap-2">
-              <span className="rounded-full border px-3 py-1 text-sm">Room {roomCode}</span>
+            <div className="flex items-center gap-3">
+              <div className="hidden md:flex -space-x-2">
+                {players.map((p) => (
+                  <Avatar key={p.id} className="border">
+                    <AvatarFallback style={{ backgroundImage: gradientFromString(p.name), color: "white" }}>
+                      {initialsFromName(p.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                ))}
+              </div>
+              <span className="rounded-full border px-3 py-1 text-sm">Room {roomCode} • {presentCount} online</span>
               <Button variant="secondary" onClick={leaveRoom}>Leave Room</Button>
             </div>
           )}
@@ -196,9 +279,44 @@ const Game = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {roomCode && (
+              <div className="mt-6">
+                <ChatPanel
+                  messages={messages}
+                  onSend={(text) => {
+                    if (!channelRef.current) return;
+                    const payload = { id: playerId, name: profileName, text, ts: Date.now() } as ChatMessage;
+                    channelRef.current.send({ type: 'broadcast', event: 'chat', payload });
+                    setMessages((m) => [...m, payload].slice(-200));
+                  }}
+                  currentName={profileName}
+                />
+              </div>
+            )}
           </aside>
         </section>
       </main>
+      {roomCode && (
+        <ResultsOverlay
+          open={showResults}
+          onClose={() => setShowResults(false)}
+          results={results}
+          presentCount={presentCount}
+          votes={votes}
+          onVote={(key) => {
+            if (!channelRef.current) return;
+            channelRef.current.send({ type: 'broadcast', event: 'vote', payload: { key, voterId: playerId } });
+            setVotes((prev) => {
+              const set = new Set([...(prev[key] || [])]);
+              set.add(playerId);
+              return { ...prev, [key]: Array.from(set) };
+            });
+          }}
+          categories={DEFAULT_CATEGORIES}
+          localPlayerId={playerId}
+        />
+      )}
     </>
   );
 };

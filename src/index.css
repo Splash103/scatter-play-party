@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design system: all tokens in HSL */
+/* Minimal design tokens only (no gradients, no custom utilities) */
 @layer base {
   :root {
     --background: 0, 0%, 100%;
@@ -35,7 +35,6 @@
 
     --radius: 0.5rem;
 
-    /* Extras removed for PostCSS compatibility */
     /* Sidebar */
     --sidebar-background: 0, 0%, 98%;
     --sidebar-foreground: 240, 5.3%, 26.1%;
@@ -85,15 +84,7 @@
     --sidebar-border: 240, 3.7%, 15.9%;
     --sidebar-ring: 217.2, 91.2%, 59.8%;
   }
-}
 
-@layer base {
   * { @apply border-border; }
   body { @apply bg-background text-foreground font-sans; }
-}
-
-/* Utilities */
-@layer utilities {
-  .hover-scale { @apply transition-transform duration-200 hover:scale-105; }
-  .pulse { @apply animate-pulse; }
 }

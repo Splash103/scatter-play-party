@@ -108,11 +108,8 @@ const Game = () => {
 
   const displayRound = useMemo(() => {
     if (running) return currentRoundIndex || Math.max(1, roundsPlayed + 1);
-    if (showResults || votingActive) return Math.min(roundsPerMatch, Math.max(1, (currentRoundIndex || roundsPlayed + 1) + 1));
-    if (roundsPlayed >= roundsPerMatch) return roundsPerMatch; // completed
-    if (roundsPlayed > 0) return roundsPlayed;
-    return 1;
-  }, [running, showResults, votingActive, currentRoundIndex, roundsPlayed, roundsPerMatch]);
+    return Math.min(roundsPerMatch, Math.max(1, roundsPlayed + 1));
+  }, [running, currentRoundIndex, roundsPlayed, roundsPerMatch]);
 
   const primaryButtonLabel = useMemo(() => {
     if (running) return "Round Running";
@@ -321,14 +318,16 @@ const Game = () => {
     }
     if (tie) nextLeader = null;
 
+    // Compute next round index based on current state
+    const nextRound = roundsPlayed + 1;
+
     setMatchTotals(newTotals);
     setStreaks(nextStreaks);
-    setRoundsPlayed((n) => n + 1);
+    setRoundsPlayed(nextRound);
     setLeaderId(nextLeader);
     setRoundCommitted(true);
 
     // Broadcast state
-    const nextRound = roundsPlayed + 1;
     channelRef.current?.send({ type: 'broadcast', event: 'scores_state', payload: {
       matchTotals: newTotals,
       streaks: nextStreaks,
@@ -337,7 +336,7 @@ const Game = () => {
     }});
 
     // Auto end match if done
-    const done = roundsPlayed + 1 >= roundsPerMatch;
+    const done = nextRound >= roundsPerMatch;
     if (done) endMatch(newTotals);
   };
 
@@ -397,11 +396,16 @@ const Game = () => {
       toast({ title: "Host only", description: "Only the host can start a round." });
       return;
     }
+
+    const willCommit = !!roomCode && showResults && !roundCommitted;
+    if (willCommit) {
+      commitRoundScores();
+    }
+
+    const effectiveRoundsPlayed = roundsPlayed + (willCommit ? 1 : 0);
+
     if (roomCode) {
-      if (showResults && !roundCommitted) {
-        commitRoundScores();
-      }
-      if (roundsPlayed >= roundsPerMatch) {
+      if (effectiveRoundsPlayed >= roundsPerMatch) {
         // Start a new match automatically
         setMatchTotals({});
         setStreaks({});
@@ -437,7 +441,7 @@ const Game = () => {
     setShowResults(false);
     setVotingActive(false);
     setRoundCommitted(false);
-    const roundIndex = roundsPlayed + 1;
+    const roundIndex = effectiveRoundsPlayed + 1;
     setCurrentRoundIndex(roundIndex);
     toast({ title: "Round started", description: `Letter: ${l} • ${timer} seconds` });
     if (roomCode && channelRef.current) {

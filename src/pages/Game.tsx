@@ -74,6 +74,7 @@ const Game = () => {
   // Match state (multiplayer)
   const [roundsPerMatch, setRoundsPerMatch] = useState<number>(5);
   const [roundsPlayed, setRoundsPlayed] = useState<number>(0);
+  const [currentRoundIndex, setCurrentRoundIndex] = useState<number>(0);
   const [activeCategories, setActiveCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [usedListIds, setUsedListIds] = useState<Set<string>>(new Set());
   const [matchTotals, setMatchTotals] = useState<Record<string, number>>({});
@@ -104,6 +105,13 @@ const Game = () => {
     if (!running || timer === 0) return 0;
     return Math.min(100, ((timer - timeLeft) / timer) * 100);
   }, [running, timeLeft, timer]);
+
+  const displayRound = useMemo(() => {
+    if (running) return currentRoundIndex || Math.max(1, roundsPlayed + 1);
+    if (showResults || votingActive) return Math.min(roundsPerMatch, Math.max(1, (currentRoundIndex || roundsPlayed + 1) + 1));
+    if (roundsPlayed > 0) return roundsPlayed;
+    return 1;
+  }, [running, showResults, votingActive, currentRoundIndex, roundsPlayed, roundsPerMatch]);
 
   useEffect(() => {
     if (!running) return;
@@ -166,6 +174,7 @@ const Game = () => {
         setVotes({});
         setShowResults(false);
         setRoundCommitted(false);
+        setCurrentRoundIndex(p.roundIndex);
         /* round index received: p.roundIndex; keep roundsPlayed as completed rounds */
         toast({ title: "Round started", description: `Letter: ${p.letter} • ${p.timer} seconds` });
         playRoundStart();
@@ -406,6 +415,7 @@ const Game = () => {
     setVotingActive(false);
     setRoundCommitted(false);
     const roundIndex = roundsPlayed + 1;
+    setCurrentRoundIndex(roundIndex);
     toast({ title: "Round started", description: `Letter: ${l} • ${timer} seconds` });
     if (roomCode && channelRef.current) {
       channelRef.current.send({ type: 'broadcast', event: 'round_start', payload: { letter: l, timer, categories, roundIndex } });
@@ -587,7 +597,7 @@ const Game = () => {
                     <CardTitle className="text-xl">Your List</CardTitle>
                     <div className="flex items-center gap-3">
                       {roomCode && (running || showResults || votingActive || roundsPlayed > 0) && (
-                        <div className="rounded-full border px-3 py-1 text-xs">Round {roundsPlayed + (running || showResults || votingActive ? 1 : 0)}/{roundsPerMatch}</div>
+                        <div className="rounded-full border px-3 py-1 text-xs">Round {displayRound}/{roundsPerMatch}</div>
                       )}
                       <div className="rounded-full border px-4 py-2 text-lg font-semibold">
                         {letter ?? "–"}

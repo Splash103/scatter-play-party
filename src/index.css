@@ -2,10 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
+/* Design system: all tokens in HSL */
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -38,25 +35,19 @@ All colors MUST be HSL.
 
     --radius: 0.5rem;
 
-    /* Enhanced design tokens */
-    --gradient-hero: linear-gradient(135deg, hsl(var(--primary) / 0.06), hsl(var(--accent) / 0.35));
+    /* Extras */
+    --gradient-hero: linear-gradient(135deg, hsl(var(--primary) / 0.08), hsl(var(--accent) / 0.18));
     --shadow-elegant: 0 20px 50px -20px hsl(var(--primary) / 0.35);
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
+    /* Sidebar */
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
@@ -88,6 +79,7 @@ All colors MUST be HSL.
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -100,11 +92,25 @@ All colors MUST be HSL.
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-
-  body {
-    @apply bg-background text-foreground;
-  }
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground font-sans; }
 }
+
+/* Minimal animations + utilities for hover/entrance */
+@keyframes fade-in {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in { animation: fade-in 0.3s ease-out both; }
+
+.hover-scale { transition: transform .2s ease; }
+.hover-scale:hover { transform: scale(1.03); }
+
+@keyframes pulse-soft {
+  0% { opacity: .6; }
+  50% { opacity: 1; }
+  100% { opacity: .6; }
+}
+
+.pulse { animation: pulse-soft 2s cubic-bezier(0.4,0,0.6,1) infinite; }

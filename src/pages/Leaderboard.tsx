@@ -39,9 +39,6 @@ export default function Leaderboard() {
         <div className="container py-8">
           <header className="mb-6 flex items-center justify-between">
             <h1 className="text-3xl font-bold tracking-tight">Leaderboard</h1>
-            <Button asChild variant="secondary" aria-label="Back to home">
-              <Link to="/">Back to Home</Link>
-            </Button>
           </header>
 
           {list.length === 0 ? (

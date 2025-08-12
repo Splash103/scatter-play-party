@@ -86,6 +86,7 @@ const Game = () => {
   } | null>(null);
   const [voteSeconds, setVoteSeconds] = useState<number>(15);
   const [voteTimeLeft, setVoteTimeLeft] = useState<number>(0);
+  const [votingActive, setVotingActive] = useState<boolean>(false);
   const leaveRoom = () => {
     navigate("/");
     toast({ title: "Left room", description: "You returned to the main menu." });
@@ -110,7 +111,10 @@ const Game = () => {
               channelRef.current.send({ type: "broadcast", event: "round_end", payload: {} });
             }
           }
-          if (!roomCode || isHost) setShowResults(true);
+          if (!roomCode || isHost) {
+            setShowResults(true);
+            setVotingActive(true);
+          }
           toast({ title: "Time's up!", description: "Review and submit your answers." });
           return 0;
         }
@@ -168,6 +172,7 @@ const Game = () => {
           channelRef.current?.send({ type: 'broadcast', event: 'round_submit', payload: r });
         }
         setShowResults(true);
+        setVotingActive(true);
       })
       .on('broadcast', { event: 'vote' }, ({ payload }) => {
         const { key, voterId } = payload as { key: string; voterId: string };
@@ -363,6 +368,7 @@ const Game = () => {
     setResults({});
     setVotes({});
     setShowResults(false);
+    setVotingActive(false);
     setRoundCommitted(false);
     const roundIndex = roundsPlayed + 1;
     toast({ title: "Round started", description: `Letter: ${l} • ${timer} seconds` });
@@ -381,7 +387,7 @@ const Game = () => {
         channelRef.current.send({ type: 'broadcast', event: 'round_end', payload: {} });
       }
     }
-    if (!roomCode || isHost) setShowResults(true);
+    if (!roomCode || isHost) { setShowResults(true); setVotingActive(true); }
     const totalFilled = Object.values(answers as Record<number, string>).filter((a) => a && a.trim().length > 0).length;
     const totalCats = activeCategories.length;
     toast({ title: "Round submitted", description: `You filled ${totalFilled}/${totalCats} categories.` });
@@ -395,9 +401,10 @@ const Game = () => {
     channelRef.current.send({ type: 'broadcast', event: 'round_submit', payload: r });
     channelRef.current.send({ type: 'broadcast', event: 'round_end', payload: {} });
     setShowResults(true);
+    setVotingActive(true);
   };
   useEffect(() => {
-    if (!showResults) { setVoteTimeLeft(0); return; }
+    if (!votingActive) { setVoteTimeLeft(0); return; }
     setVoteTimeLeft(voteSeconds);
     const id = setInterval(() => {
       setVoteTimeLeft((t) => {
@@ -406,9 +413,12 @@ const Game = () => {
           if (isHost) {
             if (!roundCommitted) commitRoundScores();
             setShowResults(false);
+            setVotingActive(false);
             if (roundsPlayed + 1 < roundsPerMatch) {
               startRound();
             }
+          } else {
+            setVotingActive(false);
           }
           return 0;
         }
@@ -416,7 +426,7 @@ const Game = () => {
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [showResults, voteSeconds, isHost, roundsPlayed, roundsPerMatch]);
+  }, [votingActive, voteSeconds, isHost, roundsPlayed, roundsPerMatch]);
 
   return (
     <>
@@ -552,7 +562,7 @@ const Game = () => {
                           {running ? `${timeLeft}s remaining` : "Timer idle"}
                         </div>
                       </div>
-                      {showResults && (
+                      {votingActive && (
                         <div className="flex items-center gap-2">
                           <span className="rounded-full border px-3 py-1 text-xs">Voting {voteTimeLeft}s</span>
                           {isHost && (
@@ -691,7 +701,7 @@ const Game = () => {
       {roomCode && (
         <ResultsOverlay
           open={showResults}
-          onClose={() => {}}
+          onClose={() => setShowResults(false)}
           results={results}
           presentCount={presentCount}
           votes={votes}
@@ -706,6 +716,7 @@ const Game = () => {
           }}
           categories={activeCategories}
           localPlayerId={playerId}
+          voteTimeLeft={voteTimeLeft}
         />
       )}
     </>

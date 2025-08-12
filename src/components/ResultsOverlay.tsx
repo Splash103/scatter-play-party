@@ -21,6 +21,7 @@ export function ResultsOverlay({
   onVote,
   categories,
   localPlayerId,
+  voteTimeLeft,
 }: {
   open: boolean;
   onClose: () => void;
@@ -30,6 +31,7 @@ export function ResultsOverlay({
   onVote: (voteKey: string) => void;
   categories: string[];
   localPlayerId: string;
+  voteTimeLeft: number;
 }) {
   const majority = Math.floor(presentCount / 2) + 1;
 
@@ -52,8 +54,9 @@ export function ResultsOverlay({
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-5xl">
-        <DialogHeader>
+        <DialogHeader className="sm:flex sm:items-center sm:justify-between">
           <DialogTitle>Round Results</DialogTitle>
+          <div className="text-sm text-muted-foreground">Voting ends in {voteTimeLeft}s</div>
         </DialogHeader>
         <div className="grid gap-6 md:grid-cols-2">
           {entries.map((r) => (

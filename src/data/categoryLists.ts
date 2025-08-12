@@ -4,8 +4,7 @@ export type CategoryList = {
   categories: string[];
 };
 
-// A curated set of premade category lists. Each list contains 12 categories.
-// Keep names short and fun for easy reference in the UI.
+// Core curated lists (12 categories each)
 export const CATEGORY_LISTS: CategoryList[] = [
   {
     id: "classic-1",
@@ -97,4 +96,145 @@ export const CATEGORY_LISTS: CategoryList[] = [
       "Museums",
     ],
   },
+  {
+    id: "nature-1",
+    name: "Nature",
+    categories: [
+      "Trees",
+      "Flowers",
+      "Birds",
+      "Sea creatures",
+      "Deserts",
+      "Weather types",
+      "Gemstones",
+      "Herbs & spices",
+      "Insects",
+      "Mammals",
+      "Planet features",
+      "Natural disasters",
+    ],
+  },
+  {
+    id: "pop-1",
+    name: "Pop Culture",
+    categories: [
+      "TV channels",
+      "Streaming shows",
+      "Celebrities",
+      "Cartoon characters",
+      "Podcasts",
+      "Music genres",
+      "Album names",
+      "YouTubers",
+      "Sports teams",
+      "Magazines",
+      "Comedians",
+      "Award shows",
+    ],
+  },
+  {
+    id: "food-1",
+    name: "Foodies",
+    categories: [
+      "Breakfast foods",
+      "Spices & seasonings",
+      "Pasta shapes",
+      "Sauces",
+      "Cheeses",
+      "Baked goods",
+      "Fruits",
+      "Vegetables",
+      "Cooking methods",
+      "Desserts",
+      "Sandwiches",
+      "Seafood dishes",
+    ],
+  },
+  {
+    id: "school-1",
+    name: "School Life",
+    categories: [
+      "Classroom items",
+      "School clubs",
+      "Homework excuses",
+      "Teachers' names",
+      "Field trip spots",
+      "Sports at school",
+      "Science terms",
+      "Math terms",
+      "History topics",
+      "Languages",
+      "Library books",
+      "School events",
+    ],
+  },
+  {
+    id: "home-1",
+    name: "At Home",
+    categories: [
+      "Kitchen utensils",
+      "Living room items",
+      "Bathroom items",
+      "Bedroom items",
+      "Cleaning supplies",
+      "Garden tools",
+      "Appliances",
+      "Wall decor",
+      "Pet supplies",
+      "DIY tools",
+      "Outdoor furniture",
+      "Smart home devices",
+    ],
+  },
 ];
+
+// A larger pool for generating randomized lists
+export const CATEGORY_POOL: string[] = Array.from(
+  new Set(
+    CATEGORY_LISTS.flatMap((l) => l.categories).concat([
+      "Boarding passes",
+      "Camping gear",
+      "Programming languages",
+      "Websites",
+      "Nuts & seeds",
+      "Sodas",
+      "Street names",
+      "Furniture brands",
+      "Phone manufacturers",
+      "Dog breeds",
+      "Cat breeds",
+      "Car models",
+      "Movie genres",
+      "Tea types",
+      "Countries in Europe",
+      "Rappers",
+      "Rock bands",
+      "Classical composers",
+      "Mobile games",
+      "Card games",
+      "Picture books",
+      "Board game pieces",
+      "Bird species",
+      "Hiking trails",
+      "Beverages",
+      "Occupations",
+      "Social networks",
+      "Kitchen gadgets",
+      "Programming tools",
+    ])
+  )
+);
+
+export function generateRandomList(count = 12): CategoryList {
+  const pool = [...CATEGORY_POOL];
+  const picks: string[] = [];
+  for (let i = 0; i < Math.min(count, pool.length); i++) {
+    const idx = Math.floor(Math.random() * pool.length);
+    picks.push(pool.splice(idx, 1)[0]);
+  }
+  return {
+    id: `rand-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    name: "Random Mix",
+    categories: picks,
+  };
+}

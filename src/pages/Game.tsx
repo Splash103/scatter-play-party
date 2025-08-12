@@ -18,7 +18,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Settings, Crown, Flame } from "lucide-react";
 import Particles from "@/components/Particles";
 import Aurora from "@/components/Aurora";
-import { CATEGORY_LISTS } from "@/data/categoryLists";
+import { CATEGORY_LISTS, generateRandomList } from "@/data/categoryLists";
 const DEFAULT_CATEGORIES = [
   "Fruits",
   "Countries",
@@ -80,6 +80,10 @@ const Game = () => {
   const [hostId, setHostId] = useState<string | null>(null);
   const [roundCommitted, setRoundCommitted] = useState<boolean>(false);
   const isHost = Boolean(roomCode) && hostId === playerId;
+  const [matchSummary, setMatchSummary] = useState<{
+    winners: { id: string; name: string; total: number }[];
+    totals: Record<string, number>;
+  } | null>(null);
   const leaveRoom = () => {
     navigate("/");
     toast({ title: "Left room", description: "You returned to the main menu." });
@@ -100,9 +104,11 @@ const Game = () => {
           setResults((prev) => ({ ...prev, [playerId]: r }));
           if (roomCode && channelRef.current) {
             channelRef.current.send({ type: "broadcast", event: "round_submit", payload: r });
-            channelRef.current.send({ type: "broadcast", event: "round_end", payload: {} });
+            if (isHost) {
+              channelRef.current.send({ type: "broadcast", event: "round_end", payload: {} });
+            }
           }
-          setShowResults(true);
+          if (!roomCode || isHost) setShowResults(true);
           toast({ title: "Time's up!", description: "Review and submit your answers." });
           return 0;
         }
@@ -110,7 +116,7 @@ const Game = () => {
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [running, roomCode, playerId, profileName, letter, answers]);
+  }, [running, roomCode, playerId, profileName, letter, answers, isHost]);
 
   useEffect(() => {
     if (!roomCode) return;
@@ -153,6 +159,12 @@ const Game = () => {
         setResults((prev) => ({ ...prev, [r.playerId]: r }));
       })
       .on('broadcast', { event: 'round_end' }, () => {
+        // Auto-submit local answers if not already submitted
+        if (!results[playerId]) {
+          const r: PlayerResult = { playerId, name: profileName, letter, answers } as PlayerResult;
+          setResults((prev) => ({ ...prev, [playerId]: r }));
+          channelRef.current?.send({ type: 'broadcast', event: 'round_submit', payload: r });
+        }
         setShowResults(true);
       })
       .on('broadcast', { event: 'vote' }, ({ payload }) => {
@@ -298,7 +310,10 @@ const Game = () => {
 
   const selectNextList = (): { id: string; categories: string[] } | null => {
     const available = CATEGORY_LISTS.filter((l) => !usedListIds.has(l.id));
-    if (available.length === 0) return null;
+    if (available.length === 0) {
+      const rand = generateRandomList();
+      return { id: rand.id, categories: rand.categories };
+    }
     const pick = available[Math.floor(Math.random() * available.length)];
     return { id: pick.id, categories: pick.categories };
   };
@@ -355,12 +370,24 @@ const Game = () => {
     setResults((prev) => ({ ...prev, [playerId]: r }));
     if (roomCode && channelRef.current) {
       channelRef.current.send({ type: 'broadcast', event: 'round_submit', payload: r });
-      channelRef.current.send({ type: 'broadcast', event: 'round_end', payload: {} });
+      if (isHost) {
+        channelRef.current.send({ type: 'broadcast', event: 'round_end', payload: {} });
+      }
     }
-    setShowResults(true);
-    const totalFilled = Object.values(answers).filter((a) => a && a.trim().length > 0).length;
+    if (!roomCode || isHost) setShowResults(true);
+    const totalFilled = Object.values(answers as Record<number, string>).filter((a) => a && a.trim().length > 0).length;
     const totalCats = activeCategories.length;
     toast({ title: "Round submitted", description: `You filled ${totalFilled}/${totalCats} categories.` });
+  };
+
+  const endRoundEarly = () => {
+    if (!roomCode || !isHost || !channelRef.current) return;
+    setRunning(false);
+    const r: PlayerResult = { playerId, name: profileName, letter, answers } as PlayerResult;
+    setResults((prev) => ({ ...prev, [playerId]: r }));
+    channelRef.current.send({ type: 'broadcast', event: 'round_submit', payload: r });
+    channelRef.current.send({ type: 'broadcast', event: 'round_end', payload: {} });
+    setShowResults(true);
   };
   return (
     <>
@@ -464,6 +491,9 @@ const Game = () => {
                   <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-xl">Your List</CardTitle>
                     <div className="flex items-center gap-3">
+                      {roomCode && (running || showResults || roundsPlayed > 0) && (
+                        <div className="rounded-full border px-3 py-1 text-xs">Round {Math.max(1, roundsPlayed)}/{roundsPerMatch}</div>
+                      )}
                       <div className="rounded-full border px-4 py-2 text-lg font-semibold">
                         {letter ?? "–"}
                       </div>
@@ -477,18 +507,22 @@ const Game = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="grid gap-4">
-                      {activeCategories.map((cat, idx) => (
-                        <div key={idx} className="grid gap-2">
-                          <Label htmlFor={`cat-${idx}`}>{idx + 1}. {cat}</Label>
-                          <Input
-                            id={`cat-${idx}`}
-                            placeholder={letter ? `Starts with ${letter}` : "Start a round to get a letter"}
-                            value={answers[idx] ?? ""}
-                            onChange={(e) => setAnswers((prev) => ({ ...prev, [idx]: e.target.value }))}
-                            disabled={!letter}
-                          />
-                        </div>
-                      ))}
+                      {letter && running ? (
+                        activeCategories.map((cat, idx) => (
+                          <div key={idx} className="grid gap-2">
+                            <Label htmlFor={`cat-${idx}`}>{idx + 1}. {cat}</Label>
+                            <Input
+                              id={`cat-${idx}`}
+                              placeholder={letter ? `Starts with ${letter}` : "Start a round to get a letter"}
+                              value={answers[idx] ?? ""}
+                              onChange={(e) => setAnswers((prev) => ({ ...prev, [idx]: e.target.value }))}
+                              disabled={!letter}
+                            />
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-sm text-muted-foreground">Categories will be revealed when the round starts.</div>
+                      )}
                     </div>
                     <div className="mt-6 flex items-center gap-3">
                       <Button onClick={startRound} disabled={running || (!!roomCode && !isHost)} className="hover-scale">

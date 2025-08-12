@@ -678,9 +678,6 @@ const Game = () => {
                       <Button onClick={startRound} disabled={running || (!!roomCode && !isHost)} className="hover-scale w-full sm:w-auto">
                         {primaryButtonLabel}
                       </Button>
-                      <Button variant="secondary" onClick={submitRound} disabled={!letter} className="hover-scale w-full sm:w-auto">
-                        Submit Round
-                      </Button>
                       {roomCode && isHost && running && (
                         <Button variant="outline" onClick={endRoundEarly} className="hover-scale w-full sm:w-auto">
                           End Round (Host)

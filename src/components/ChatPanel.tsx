@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useEffect, useRef, useState } from "react";
 import { Crown, Flame } from "lucide-react";
-
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { gradientFromString, initialsFromName } from "@/lib/gradient";
 export type ChatMessage = {
   id: string; // sender id
   name: string;
@@ -57,7 +58,12 @@ export function ChatPanel({
               const s = streaks[m.id] ?? 0;
               const isStreak = s > 0;
               return (
-                <div key={i} className="text-sm flex items-center gap-1">
+                <div key={i} className="text-sm flex items-center gap-2">
+                  <Avatar className="h-6 w-6 border">
+                    <AvatarFallback style={{ backgroundImage: gradientFromString(m.name), color: "white" }}>
+                      {initialsFromName(m.name)}
+                    </AvatarFallback>
+                  </Avatar>
                   <span className="font-medium flex items-center gap-1">
                     {isHost ? <Crown className="h-3.5 w-3.5 text-primary" aria-label="Host" /> : null}
                     {isYou ? "You" : m.name}

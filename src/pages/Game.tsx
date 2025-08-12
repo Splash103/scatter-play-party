@@ -234,8 +234,8 @@ const Game = () => {
         setLeaderId(p.leaderId ?? null);
       })
       .on('broadcast', { event: 'match_end' }, ({ payload }) => {
-        const p = payload as { winners: { id: string; name: string; total: number }[] };
-        // Update local leaderboard
+        const p = payload as { winners: { id: string; name: string; total: number }[]; matchId?: string };
+        // Update local leaderboard (legacy local storage)
         try {
           const raw = localStorage.getItem('leaderboard');
           const existing = raw ? (JSON.parse(raw) as { name: string; wins: number }[]) : [];
@@ -247,6 +247,25 @@ const Game = () => {
           localStorage.setItem('leaderboard', JSON.stringify(updated));
         } catch (_) {}
         toast({ title: "Match over!", description: `Winner(s): ${p.winners.map((w) => w.name).join(', ')}` });
+
+        // Persist to Supabase if signed in
+        (async () => {
+          const { data: sess } = await supabase.auth.getSession();
+          const user = sess.session?.user;
+          if (!user) return;
+          const meWon = p.winners.some((w) => w.id === playerId);
+          // Ensure profile exists and update streaks
+          const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+          const display_name = prof?.display_name || profileName || user.email || 'Player';
+          const current_streak = meWon ? (prof?.current_streak ?? 0) + 1 : 0;
+          const best_streak = Math.max(prof?.best_streak ?? 0, current_streak);
+          await supabase.from('profiles').upsert({ id: user.id, display_name, current_streak, best_streak }).select();
+          // Record a match win if this client won and we have a matchId
+          if (meWon && p.matchId) {
+            await supabase.from('match_wins').insert({ match_id: p.matchId, user_id: user.id }).select();
+          }
+        })();
+
         // Show final scoreboard to non-host clients too
         if (!isHost) {
           const currentPlayers = players.map((pl) => ({ id: pl.id, name: pl.name }));
@@ -302,22 +321,21 @@ const Game = () => {
         const key = `${r.playerId}:${idx}`;
         const dq = (votes[key]?.length || 0) >= majority;
         const startsOk = !!ans && targetLetter && ans.trimStart().charAt(0).toUpperCase() === targetLetter;
-        if (!dq && startsOk) score += 1;
+        if (startsOk && !dq) score += 1;
+        if (dq && !!ans?.trim()) score -= 1; // majority removal penalty
       }
       perPlayerRoundScore[r.playerId] = score;
       newTotals[r.playerId] = (newTotals[r.playerId] ?? 0) + score;
     }
-    // Determine round winners
+    // Determine round winners (for UI only); do NOT update streaks here (streaks are per MATCH)
     const maxScore = Math.max(0, ...Object.values(perPlayerRoundScore));
     const winners = Object.entries(perPlayerRoundScore)
       .filter(([, s]) => s === maxScore)
       .map(([id]) => id);
-    // Update streaks
-    const allPlayerIds = new Set<string>([...Object.keys(newTotals), ...players.map((p) => p.id)]);
-    for (const id of allPlayerIds) {
-      if (winners.includes(id)) nextStreaks[id] = (nextStreaks[id] ?? 0) + 1;
-      else nextStreaks[id] = 0;
-    }
+
+    // Keep streaks unchanged during rounds
+    const nextStreaks: Record<string, number> = { ...streaks };
+
     // Compute leader by totals (tie => null)
     let nextLeader: string | null = null;
     let maxTotal = -1;
@@ -371,13 +389,16 @@ const Game = () => {
       if (winnerIds.has(p.id)) newStreaks[p.id] = (newStreaks[p.id] ?? 0) + 1; else newStreaks[p.id] = 0;
     }
 
+    // Create a match id for persistence
+    const matchId = (crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)) as string;
+
     // Open final scoreboard locally
     setMatchSummary({ winners, totals, players: currentPlayers });
     setFinalOpen(true);
     playWin();
 
-    // Broadcast to room
-    channelRef.current?.send({ type: 'broadcast', event: 'match_end', payload: { winners } });
+    // Broadcast to room (include match id)
+    channelRef.current?.send({ type: 'broadcast', event: 'match_end', payload: { winners, matchId } });
     channelRef.current?.send({ type: 'broadcast', event: 'scores_state', payload: {
       matchTotals: totals,
       streaks: newStreaks,

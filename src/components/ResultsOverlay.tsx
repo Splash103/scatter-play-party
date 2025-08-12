@@ -47,7 +47,7 @@ export function ResultsOverlay({
       const val = r.answers[i];
       if (!val || !val.trim()) continue;
       const key = `${r.playerId}:${i}`;
-      if (!isDisqualified(key)) s += 1;
+      if (isDisqualified(key)) s -= 1; else s += 1;
     }
     return s;
   };
@@ -139,7 +139,7 @@ export function ResultsOverlay({
                                   })}
                                 </div>
                               )}
-                              {disq && <Badge variant="secondary">Removed</Badge>}
+                              {disq && <Badge variant="secondary">Removed (-1)</Badge>}
                               {!!val && !disq && (
                                 <Button
                                   size="sm"

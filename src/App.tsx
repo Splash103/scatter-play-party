@@ -10,6 +10,7 @@ import Game from "./pages/Game";
 import Leaderboard from "./pages/Leaderboard";
 import Lobby from "./pages/Lobby";
 
+import HomeButton from "@/components/HomeButton";
 
 const queryClient = new QueryClient();
 
@@ -20,7 +21,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          
+          <HomeButton />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/game" element={<Game />} />

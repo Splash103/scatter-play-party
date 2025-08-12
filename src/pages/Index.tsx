@@ -7,6 +7,8 @@ import { toast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { gradientFromString, initialsFromName } from "@/lib/gradient";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { PlusCircle, KeyRound, UserCircle2, Trophy, Gamepad2 } from "lucide-react";
 const ROOM_ALPHABET = "ABCDEFGHJKMNPQRSTWXYZ";
 function generateRoomCode(len = 4) {
   let out = "";
@@ -55,42 +57,98 @@ const Index = () => {
       </Helmet>
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div
-          className="w-full max-w-3xl mx-auto text-center p-10 rounded-lg"
+          className="w-full max-w-5xl mx-auto p-6 sm:p-10 rounded-lg"
           style={{ background: "var(--gradient-hero)", boxShadow: "var(--shadow-elegant)" }}
         >
-          <h1 className="text-4xl font-bold mb-3">Play Scattergories Online</h1>
-          <p className="text-lg text-muted-foreground mb-8">Fast rounds, random letters, and a beautiful experience. Multiplayer coming live with rooms.</p>
+          <header className="text-center mb-8">
+            <h1 className="text-4xl font-bold tracking-tight">Play Scattergories Online</h1>
+            <p className="text-lg text-muted-foreground mt-2">Create or join rooms, practice solo, and check the leaderboard.</p>
+          </header>
 
-<div className="flex flex-col gap-3 sm:flex-row sm:justify-center sm:items-center mb-6">
-            <Button onClick={createRoom}>Create Room</Button>
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-center">
-              <Input
-                value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value)}
-                placeholder="Enter room code"
-                className="w-48"
-              />
-              <Button variant="secondary" onClick={joinRoom}>Join</Button>
-            </div>
-          </div>
+          <main className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <Card className="hover-scale animate-fade-in">
+              <CardHeader className="flex-row items-center gap-2">
+                <PlusCircle className="text-primary" />
+                <CardTitle>Create Room</CardTitle>
+                <CardDescription>Generate a code and invite friends.</CardDescription>
+              </CardHeader>
+              <CardFooter>
+                <Button onClick={createRoom} aria-label="Create room">Create</Button>
+              </CardFooter>
+            </Card>
 
-          <div className="mt-2 flex items-center justify-center">
-            {name ? (
-              <div className="flex items-center gap-3">
+            <Card className="hover-scale animate-fade-in">
+              <CardHeader className="flex-row items-center gap-2">
+                <KeyRound className="text-primary" />
+                <CardTitle>Join Room</CardTitle>
+                <CardDescription>Enter a room code to join.</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value)}
+                    placeholder="Room code"
+                    aria-label="Room code"
+                  />
+                  <Button variant="secondary" onClick={joinRoom} aria-label="Join room">Join</Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="hover-scale animate-fade-in">
+              <CardHeader className="flex-row items-center gap-2">
+                <UserCircle2 className="text-primary" />
+                <CardTitle>Your Profile</CardTitle>
+                <CardDescription>Set your display name and avatar.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex items-center gap-3">
                 <Avatar>
-                  <AvatarFallback
-                    style={{ backgroundImage: gradientFromString(name), color: "white" }}
-                  >
-                    {initialsFromName(name)}
+                  <AvatarFallback style={{ backgroundImage: gradientFromString(name || "Player"), color: "white" }}>
+                    {initialsFromName(name || "P")}
                   </AvatarFallback>
                 </Avatar>
-                <span className="text-sm">Playing as <span className="font-medium">{name}</span></span>
-                <Button variant="secondary" onClick={() => setProfileOpen(true)}>Edit profile</Button>
-              </div>
-            ) : (
-              <Button variant="secondary" onClick={() => setProfileOpen(true)}>Create your profile</Button>
-            )}
-          </div>
+                <div className="text-sm">
+                  {name ? (
+                    <span>Playing as <span className="font-medium">{name}</span></span>
+                  ) : (
+                    <span className="text-muted-foreground">No name set</span>
+                  )}
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button variant="secondary" onClick={() => setProfileOpen(true)} aria-label="Edit profile">
+                  {name ? "Edit profile" : "Create profile"}
+                </Button>
+              </CardFooter>
+            </Card>
+
+            <Card className="hover-scale animate-fade-in">
+              <CardHeader className="flex-row items-center gap-2">
+                <Trophy className="text-primary" />
+                <CardTitle>Leaderboard</CardTitle>
+                <CardDescription>Top players and recent wins.</CardDescription>
+              </CardHeader>
+              <CardFooter>
+                <Button asChild aria-label="Open leaderboard">
+                  <Link to="/leaderboard">View Leaderboard</Link>
+                </Button>
+              </CardFooter>
+            </Card>
+
+            <Card className="hover-scale animate-fade-in">
+              <CardHeader className="flex-row items-center gap-2">
+                <Gamepad2 className="text-primary" />
+                <CardTitle>Solo Round</CardTitle>
+                <CardDescription>Practice on your own.</CardDescription>
+              </CardHeader>
+              <CardFooter>
+                <Button asChild aria-label="Start solo round">
+                  <Link to="/game">Start Solo</Link>
+                </Button>
+              </CardFooter>
+            </Card>
+          </main>
 
           <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
             <DialogContent>
@@ -110,12 +168,6 @@ const Index = () => {
               </div>
             </DialogContent>
           </Dialog>
-
-          <div className="opacity-90">
-            <Button asChild>
-              <Link to="/game">Start a Solo Round</Link>
-            </Button>
-          </div>
         </div>
       </div>
     </>

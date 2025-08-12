@@ -47,6 +47,7 @@ const Game = () => {
   const [timeLeft, setTimeLeft] = useState<number>(180);
   const [running, setRunning] = useState(false);
   const [letter, setLetter] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const roomCode: string | null = ((searchParams.get("room") || "").toUpperCase()) || null;

@@ -9,30 +9,32 @@ import NotFound from "./pages/NotFound";
 import Game from "./pages/Game";
 import Leaderboard from "./pages/Leaderboard";
 import Lobby from "./pages/Lobby";
-
+import { ThemeProvider } from "next-themes";
 import HomeButton from "@/components/HomeButton";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <HelmetProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <HomeButton />
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/game" element={<Game />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/lobby" element={<Lobby />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </HelmetProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <HelmetProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <HomeButton />
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/game" element={<Game />} />
+              <Route path="/leaderboard" element={<Leaderboard />} />
+              <Route path="/lobby" element={<Lobby />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </HelmetProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

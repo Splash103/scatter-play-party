@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { gradientFromString, initialsFromName } from "@/lib/gradient";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import Particles from "@/components/Particles";
-import { PlusCircle, Users, UserCircle2, Trophy, Gamepad2 } from "lucide-react";
+import { PlusCircle, Users, UserCircle2, Trophy, Gamepad2, Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
 const ROOM_ALPHABET = "ABCDEFGHJKMNPQRSTWXYZ";
 function generateRoomCode(len = 4) {
   let out = "";
@@ -23,6 +24,7 @@ const Index = () => {
   const [name, setName] = useState<string>(() => localStorage.getItem("profileName") || "");
   const navigate = useNavigate();
   const [playOpen, setPlayOpen] = useState(false);
+  const { resolvedTheme, setTheme } = useTheme();
 
   const createRoom = () => {
     const code = generateRoomCode();
@@ -50,7 +52,12 @@ const Index = () => {
       </Helmet>
       <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-accent/10 to-background overflow-hidden">
         <Particles />
-        <div className="relative z-10 w-full max-w-5xl mx-auto p-6 sm:p-10 rounded-lg border bg-background/60 backdrop-blur-xl">
+        <div className="relative z-10 w-full max-w-5xl mx-auto p-6 sm:p-10 rounded-lg border bg-background/60 backdrop-blur-xl shadow-[var(--shadow-elegant)]">
+          <div className="absolute right-4 top-4">
+            <Button variant="secondary" size="icon" aria-label="Toggle theme" onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}>
+              {resolvedTheme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+          </div>
           <header className="text-center mb-8">
             <h1 className="text-4xl font-bold tracking-tight">Play Scattergories Online</h1>
             <p className="text-lg text-muted-foreground mt-2">Choose how you want to play, explore the lobby, and check the leaderboard.</p>

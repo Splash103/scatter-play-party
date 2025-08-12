@@ -28,16 +28,21 @@ const Index = () => {
         <link rel="canonical" href="/" />
       </Helmet>
 
-      <div className="relative min-h-screen flex items-center justify-center bg-background">
+      <div className="relative min-h-screen bg-background">
         <Particles />
-        <div className="w-full max-w-6xl mx-auto p-6 sm:p-10 rounded-xl bg-card/60 backdrop-blur-xl shadow-xl">
-          <header className="text-center mb-8">
-            <h1 className="text-4xl font-bold tracking-tight">Play Scattergories</h1>
-            <p className="text-lg text-muted-foreground mt-2">Choose a mode or browse rooms. Everything is fast and real‑time.</p>
+        <div className="w-full max-w-6xl mx-auto p-6 sm:p-12">
+          <header className="mb-10 animate-fade-in">
+            <div
+              className="rounded-2xl p-8 sm:p-12 bg-clip-padding backdrop-blur-xl border shadow-lg"
+              style={{ background: "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)))" }}
+            >
+              <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-primary-foreground">Play Scattergories</h1>
+              <p className="text-lg mt-2 text-primary-foreground/80">Choose a mode or browse rooms. Everything is fast and real-time.</p>
+            </div>
           </header>
 
-          <main className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            <Card className="bg-card/60 backdrop-blur-xl hover-scale animate-fade-in">
+          <main className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+            <Card className="bg-card/60 backdrop-blur-xl hover-scale animate-fade-in transition-shadow hover:shadow-xl">
               <CardHeader>
                 <CardTitle>Play</CardTitle>
                 <CardDescription>Solo or create a room.</CardDescription>
@@ -49,7 +54,7 @@ const Index = () => {
               </CardFooter>
             </Card>
 
-            <Card className="bg-card/60 backdrop-blur-xl hover-scale animate-fade-in">
+            <Card className="bg-card/60 backdrop-blur-xl hover-scale animate-fade-in transition-shadow hover:shadow-xl">
               <CardHeader>
                 <CardTitle>Lobby</CardTitle>
                 <CardDescription>See public rooms.</CardDescription>
@@ -61,7 +66,7 @@ const Index = () => {
               </CardFooter>
             </Card>
 
-            <Card className="bg-card/60 backdrop-blur-xl hover-scale animate-fade-in">
+            <Card className="bg-card/60 backdrop-blur-xl hover-scale animate-fade-in transition-shadow hover:shadow-xl">
               <CardHeader>
                 <CardTitle>Leaderboard</CardTitle>
                 <CardDescription>Top players and recent wins.</CardDescription>
@@ -73,7 +78,7 @@ const Index = () => {
               </CardFooter>
             </Card>
 
-            <Card className="bg-card/60 backdrop-blur-xl hover-scale animate-fade-in sm:col-span-2 lg:col-span-3">
+            <Card className="bg-card/60 backdrop-blur-xl hover-scale animate-fade-in sm:col-span-2 lg:col-span-3 transition-shadow hover:shadow-xl">
               <CardHeader className="flex-row items-center gap-2">
                 <CardTitle>Your Profile</CardTitle>
                 <CardDescription>Set your display name and avatar.</CardDescription>

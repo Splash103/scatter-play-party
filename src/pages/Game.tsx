@@ -291,10 +291,11 @@ const Game = () => {
     setRoundCommitted(true);
 
     // Broadcast state
+    const nextRound = roundsPlayed + 1;
     channelRef.current?.send({ type: 'broadcast', event: 'scores_state', payload: {
       matchTotals: newTotals,
       streaks: nextStreaks,
-      roundsPlayed: roundsPlayed + 1,
+      roundsPlayed: nextRound,
       leaderId: nextLeader,
     }});
 
@@ -550,8 +551,8 @@ const Game = () => {
                   <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-xl">Your List</CardTitle>
                     <div className="flex items-center gap-3">
-                      {roomCode && (running || showResults || roundsPlayed > 0) && (
-                        <div className="rounded-full border px-3 py-1 text-xs">Round {roundsPlayed + (running || showResults ? 1 : 0)}/{roundsPerMatch}</div>
+                      {roomCode && (running || showResults || votingActive || roundsPlayed > 0) && (
+                        <div className="rounded-full border px-3 py-1 text-xs">Round {roundsPlayed + (running || showResults || votingActive ? 1 : 0)}/{roundsPerMatch}</div>
                       )}
                       <div className="rounded-full border px-4 py-2 text-lg font-semibold">
                         {letter ?? "–"}
@@ -717,6 +718,7 @@ const Game = () => {
           categories={activeCategories}
           localPlayerId={playerId}
           voteTimeLeft={voteTimeLeft}
+          players={players}
         />
       )}
     </>

@@ -92,14 +92,8 @@
   body { @apply bg-background text-foreground font-sans; }
 }
 
-/* Safe utility classes */
+/* Utilities */
 @layer utilities {
   .hover-scale { @apply transition-transform duration-200 hover:scale-105; }
   .pulse { @apply animate-pulse; }
-  .animate-fade-in { animation: fade-in 0.3s ease-out both; }
-}
-
-@keyframes fade-in {
-  0% { opacity: 0; transform: translateY(8px); }
-  100% { opacity: 1; transform: translateY(0); }
 }

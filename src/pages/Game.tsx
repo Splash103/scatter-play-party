@@ -97,6 +97,8 @@ const Game = () => {
   });
   useEffect(() => { localStorage.setItem('soundOn', JSON.stringify(soundOn)); }, [soundOn]);
   const { playRoundStart, playVote, playWin } = useGameSounds(soundOn);
+  const [roundStarting, setRoundStarting] = useState<boolean>(false);
+  const roundStartingRef = useRef<boolean>(false);
   const leaveRoom = () => {
     navigate("/");
     toast({ title: "Left room", description: "You returned to the main menu." });
@@ -107,12 +109,13 @@ const Game = () => {
   }, [running, timeLeft, timer]);
 
   const displayRound = useMemo(() => {
-    if (running || showResults || votingActive) {
-      return currentRoundIndex || (roundsPlayed > 0 ? roundsPlayed : 1);
-    }
-    if (roundsPlayed >= roundsPerMatch) return roundsPerMatch;
-    return Math.max(1, roundsPlayed + 1);
-  }, [running, showResults, votingActive, currentRoundIndex, roundsPlayed, roundsPerMatch]);
+    if (currentRoundIndex > 0) return currentRoundIndex;
+    const base = roundsPlayed;
+    const inProgress = running || showResults || votingActive;
+    const next = base + (inProgress ? 1 : 0);
+    if (next <= 0) return 1;
+    return Math.min(roundsPerMatch, next);
+  }, [currentRoundIndex, roundsPlayed, running, showResults, votingActive, roundsPerMatch]);
 
   const primaryButtonLabel = useMemo(() => {
     if (running) return "Round Running";
@@ -186,6 +189,8 @@ const Game = () => {
         /* round index received: p.roundIndex; keep roundsPlayed as completed rounds */
         toast({ title: "Round started", description: `Letter: ${p.letter} • ${p.timer} seconds` });
         playRoundStart();
+        setRoundStarting(false);
+        roundStartingRef.current = false;
       })
       .on('broadcast', { event: 'round_submit' }, ({ payload }) => {
         const r = payload as PlayerResult;
@@ -198,6 +203,7 @@ const Game = () => {
           setResults((prev) => ({ ...prev, [playerId]: r }));
           channelRef.current?.send({ type: 'broadcast', event: 'round_submit', payload: r });
         }
+        setRunning(false);
         setShowResults(true);
         setVotingActive(true);
       })
@@ -401,12 +407,16 @@ const Game = () => {
       return;
     }
 
+    if (roundStartingRef.current) return;
+    roundStartingRef.current = true;
+    setRoundStarting(true);
+
     const willCommit = !!roomCode && showResults && !roundCommitted;
     if (willCommit) {
       commitRoundScores();
     }
 
-    const effectiveRoundsPlayed = roundsPlayed + (willCommit ? 1 : 0);
+    let effectiveRoundsPlayed = roundsPlayed + (willCommit ? 1 : 0);
 
     if (roomCode) {
       if (effectiveRoundsPlayed >= roundsPerMatch) {
@@ -417,6 +427,7 @@ const Game = () => {
         setUsedListIds(new Set());
         setRoundsPlayed(0);
         setCurrentRoundIndex(0);
+        effectiveRoundsPlayed = 0; // reset counter for new match
         // continue to start first round of new match
       }
     }
@@ -428,6 +439,8 @@ const Game = () => {
       const next = selectNextList();
       if (!next) {
         toast({ title: "No lists left", description: "All lists used this match." });
+        roundStartingRef.current = false;
+        setRoundStarting(false);
         return;
       }
       categories = next.categories;
@@ -452,6 +465,9 @@ const Game = () => {
     if (roomCode && channelRef.current) {
       channelRef.current.send({ type: 'broadcast', event: 'round_start', payload: { letter: l, timer, categories, roundIndex } });
     }
+
+    // Safety: release debounce if we don't get our own broadcast echo
+    setTimeout(() => { roundStartingRef.current = false; setRoundStarting(false); }, 500);
   };
 
   const submitRound = () => {
@@ -684,7 +700,7 @@ const Game = () => {
                       )}
                     </div>
                     <div className="mt-4 sm:mt-6 flex items-center gap-2 sm:gap-3">
-                      <Button onClick={startRound} disabled={running || (!!roomCode && !isHost)} className="hover-scale w-full sm:w-auto">
+                      <Button onClick={startRound} disabled={running || roundStarting || (!!roomCode && !isHost)} className="hover-scale w-full sm:w-auto">
                         {primaryButtonLabel}
                       </Button>
                       {roomCode && isHost && running && (

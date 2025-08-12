@@ -124,6 +124,15 @@ const Game = () => {
     return "Next Round";
   }, [running, roundsPlayed, roundsPerMatch, currentRoundIndex, roomCode]);
 
+  // Lock settings when a match is in progress (any round started until match ends)
+  const matchInProgress = useMemo(
+    () => running || showResults || votingActive || roundsPlayed > 0 || currentRoundIndex > 0,
+    [running, showResults, votingActive, roundsPlayed, currentRoundIndex]
+  );
+  const matchInProgressRef = useRef(false);
+  useEffect(() => {
+    matchInProgressRef.current = matchInProgress;
+  }, [matchInProgress]);
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => {
@@ -220,6 +229,8 @@ const Game = () => {
         setVoteTimeLeft((t) => t + (add || 0));
       })
       .on('broadcast', { event: 'room_settings' }, ({ payload }) => {
+        // Ignore mid-match setting changes
+        if (matchInProgressRef.current) return;
         const p = payload as { timer: number; roundsPerMatch: number; voteSeconds?: number };
         setTimer(p.timer);
         setRoundsPerMatch(p.roundsPerMatch);
@@ -437,19 +448,16 @@ const Game = () => {
 
     let effectiveRoundsPlayed = roundsPlayed + (willCommit ? 1 : 0);
 
-    if (roomCode) {
-      if (effectiveRoundsPlayed >= roundsPerMatch) {
-        // Start a new match automatically
-        setMatchTotals({});
-        setStreaks({});
-        setLeaderId(null);
-        setUsedListIds(new Set());
-        setRoundsPlayed(0);
-        setCurrentRoundIndex(0);
-        effectiveRoundsPlayed = 0; // reset counter for new match
-        // continue to start first round of new match
+      if (roomCode) {
+        if (effectiveRoundsPlayed >= roundsPerMatch) {
+          // Do not auto-start a new match; show final results instead
+          toast({ title: "Match finished", description: "View the final scoreboard. Start a new match from there." });
+          roundStartingRef.current = false;
+          setRoundStarting(false);
+          return;
+        }
       }
-    }
+
 
     // Pick categories for this round
     let categories = activeCategories;
@@ -577,7 +585,14 @@ const Game = () => {
 
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button variant="ghost" size="icon" aria-label="Room settings" className="hover-scale">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Room settings"
+                        className="hover-scale"
+                        disabled={matchInProgress}
+                        title={matchInProgress ? "Settings are locked during a match" : undefined}
+                      >
                         <Settings className="h-5 w-5" />
                       </Button>
                     </DialogTrigger>
@@ -591,9 +606,14 @@ const Game = () => {
                           <Label>Timer</Label>
                           <Select value={String(timer)} onValueChange={(v) => {
                             const val = parseInt(v, 10);
+                            if (matchInProgress) {
+                              toast({ title: "Settings locked", description: "Cannot change during a match." });
+                              return;
+                            }
                             setTimer(val);
                             if (roomCode && isHost) channelRef.current?.send({ type: 'broadcast', event: 'room_settings', payload: { timer: val, roundsPerMatch, voteSeconds } });
-                          }} disabled={!!roomCode && !isHost}>
+                          }} disabled={!!roomCode && (!isHost || matchInProgress)}>
+
                             <SelectTrigger>
                               <SelectValue placeholder="Select duration" />
                             </SelectTrigger>
@@ -611,9 +631,14 @@ const Game = () => {
                           <Label>Rounds per match</Label>
                           <Select value={String(roundsPerMatch)} onValueChange={(v) => {
                             const val = parseInt(v, 10);
+                            if (matchInProgress) {
+                              toast({ title: "Settings locked", description: "Cannot change during a match." });
+                              return;
+                            }
                             setRoundsPerMatch(val);
                             if (roomCode && isHost) channelRef.current?.send({ type: 'broadcast', event: 'room_settings', payload: { timer, roundsPerMatch: val, voteSeconds } });
-                          }} disabled={!!roomCode && !isHost}>
+                          }} disabled={!!roomCode && (!isHost || matchInProgress)}>
+
                             <SelectTrigger>
                               <SelectValue placeholder="Select rounds" />
                             </SelectTrigger>
@@ -631,9 +656,14 @@ const Game = () => {
                           <Label>Voting window</Label>
                           <Select value={String(voteSeconds)} onValueChange={(v) => {
                             const val = parseInt(v, 10);
+                            if (matchInProgress) {
+                              toast({ title: "Settings locked", description: "Cannot change during a match." });
+                              return;
+                            }
                             setVoteSeconds(val);
                             if (roomCode && isHost) channelRef.current?.send({ type: 'broadcast', event: 'room_settings', payload: { timer, roundsPerMatch, voteSeconds: val } });
-                          }} disabled={!!roomCode && !isHost}>
+                          }} disabled={!!roomCode && (!isHost || matchInProgress)}>
+
                             <SelectTrigger>
                               <SelectValue placeholder="Select voting time" />
                             </SelectTrigger>

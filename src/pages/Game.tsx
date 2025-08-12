@@ -65,14 +65,7 @@ const Game = () => {
   const [votes, setVotes] = useState<Record<string, string[]>>({});
   const [showResults, setShowResults] = useState(false);
 
-  const canLoseProgress = () => running || (!!letter && !showResults);
-  const confirmLeave = () => {
-    if (!canLoseProgress()) return true;
-    return window.confirm("Are you sure you want to leave? Your current round progress will be lost.");
-  };
-
   const leaveRoom = () => {
-    if (!confirmLeave()) return;
     navigate("/");
     toast({ title: "Left room", description: "You returned to the main menu." });
   };
@@ -103,17 +96,6 @@ const Game = () => {
     }, 1000);
     return () => clearInterval(id);
   }, [running, roomCode, playerId, profileName, letter, answers]);
-
-  useEffect(() => {
-    const handler = (e: BeforeUnloadEvent) => {
-      if (canLoseProgress()) {
-        e.preventDefault();
-        e.returnValue = "";
-      }
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [running, letter, showResults]);
 
   useEffect(() => {
     if (!roomCode) return;
@@ -199,18 +181,15 @@ const Game = () => {
   return (
     <>
       <Helmet>
-        <title>Scattergories Online — Game</title>
-        <meta name="description" content="Play Scattergories solo or in rooms with friends. Modern glass UI with chat and realtime rounds." />
+        <title>Scattergories Online — Solo Round</title>
+        <meta name="description" content="Play Scattergories online in solo mode. Random letters, timed rounds, and 12 classic categories. Start a quick round now!" />
         <link rel="canonical" href="/game" />
       </Helmet>
-      <main className="container mx-auto py-8 relative">
-        <header className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Button variant="secondary" onClick={() => { if (confirmLeave()) navigate(-1); }} aria-label="Go back">Back</Button>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Scattergories Online — {roomCode ? "Room" : "Solo"}</h1>
-              <p className="text-muted-foreground mt-1">12 categories • one letter • beat the clock</p>
-            </div>
+      <main className="container mx-auto py-8">
+<header className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Scattergories Online — {roomCode ? "Room" : "Solo"}</h1>
+            <p className="text-muted-foreground mt-1">12 categories • one letter • beat the clock</p>
           </div>
           {roomCode && (
             <div className="flex items-center gap-3">
@@ -230,20 +209,20 @@ const Game = () => {
         </header>
 
         <section className="grid gap-6 md:grid-cols-[1fr,360px]">
-          <article className="animate-fade-in">
-            <Card className="bg-card/60 backdrop-blur-xl">
+          <article>
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-xl">Your List</CardTitle>
                 <div className="flex items-center gap-3">
                   <div className="rounded-full border px-4 py-2 text-lg font-semibold">
                     {letter ?? "–"}
                   </div>
-                    <div className="w-40 animate-fade-in">
-                      <Progress value={progress} />
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {running ? `${timeLeft}s remaining` : "Timer idle"}
-                      </div>
+                  <div className="w-40">
+                    <Progress value={progress} />
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {running ? `${timeLeft}s remaining` : "Timer idle"}
                     </div>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -262,10 +241,10 @@ const Game = () => {
                   ))}
                 </div>
                 <div className="mt-6 flex items-center gap-3">
-                  <Button onClick={startRound} disabled={running} className="hover-scale">
+                  <Button onClick={startRound} disabled={running}>
                     {running ? "Round Running" : "Start Round"}
                   </Button>
-                  <Button variant="secondary" onClick={submitRound} disabled={!letter} className="hover-scale">
+                  <Button variant="secondary" onClick={submitRound} disabled={!letter}>
                     Submit Round
                   </Button>
                 </div>
@@ -273,8 +252,8 @@ const Game = () => {
             </Card>
           </article>
 
-          <aside className="animate-fade-in">
-            <Card className="bg-card/60 backdrop-blur-xl">
+          <aside>
+            <Card>
               <CardHeader>
                 <CardTitle>Round Settings</CardTitle>
               </CardHeader>
@@ -302,7 +281,7 @@ const Game = () => {
             </Card>
 
             {roomCode && (
-              <div className="mt-6 animate-fade-in">
+              <div className="mt-6">
                 <ChatPanel
                   messages={messages}
                   onSend={(text) => {

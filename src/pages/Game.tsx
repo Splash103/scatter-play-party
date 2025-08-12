@@ -109,9 +109,17 @@ const Game = () => {
   const displayRound = useMemo(() => {
     if (running) return currentRoundIndex || Math.max(1, roundsPlayed + 1);
     if (showResults || votingActive) return Math.min(roundsPerMatch, Math.max(1, (currentRoundIndex || roundsPlayed + 1) + 1));
+    if (roundsPlayed >= roundsPerMatch) return roundsPerMatch; // completed
     if (roundsPlayed > 0) return roundsPlayed;
     return 1;
   }, [running, showResults, votingActive, currentRoundIndex, roundsPlayed, roundsPerMatch]);
+
+  const primaryButtonLabel = useMemo(() => {
+    if (running) return "Round Running";
+    if (roundsPlayed >= roundsPerMatch) return "Start New Match";
+    if (roundsPlayed === 0 && !currentRoundIndex) return roomCode ? "Start Match" : "Start Round";
+    return "Next Round";
+  }, [running, roundsPlayed, roundsPerMatch, currentRoundIndex, roomCode]);
 
   useEffect(() => {
     if (!running) return;
@@ -394,8 +402,13 @@ const Game = () => {
         commitRoundScores();
       }
       if (roundsPlayed >= roundsPerMatch) {
-        toast({ title: "Match complete", description: "Start a new match from settings." });
-        return;
+        // Start a new match automatically
+        setMatchTotals({});
+        setStreaks({});
+        setLeaderId(null);
+        setUsedListIds(new Set());
+        setRoundsPlayed(0);
+        // continue to start first round of new match
       }
     }
 
@@ -492,13 +505,13 @@ const Game = () => {
         <Particles />
         <main className="relative z-10 container mx-auto py-8">
           <div className="rounded-xl border border-border/60 bg-background/60 backdrop-blur-xl p-4 md:p-6 shadow-[var(--shadow-elegant)]">
-            <header className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-lg p-4 bg-gradient-to-r from-primary/10 to-transparent animate-fade-in">
+            <header className="mb-4 sm:mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-lg p-3 sm:p-4 bg-gradient-to-r from-primary/10 to-transparent animate-fade-in">
               <div>
-                <h1 className="text-3xl font-bold tracking-tight">Scattergories Online — {roomCode ? "Room" : "Solo"}</h1>
-                <p className="text-muted-foreground mt-1">12 categories • one letter • beat the clock</p>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Scattergories Online — {roomCode ? "Room" : "Solo"}</h1>
+                <p className="text-muted-foreground mt-1 text-sm sm:text-base">12 categories • one letter • beat the clock</p>
               </div>
               {roomCode && (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                   <div className="hidden md:flex -space-x-2">
                     {players.map((p) => (
                       <Avatar key={p.id} className="border shadow">
@@ -508,8 +521,8 @@ const Game = () => {
                       </Avatar>
                     ))}
                   </div>
-                  <span className="rounded-full border px-3 py-1 text-sm">Room {roomCode} • {presentCount} online</span>
-  
+                  <span className="rounded-full border px-2 py-0.5 text-xs sm:text-sm sm:px-3 sm:py-1">Room {roomCode} • {presentCount} online</span>
+
                   <Button variant="ghost" size="icon" aria-label={soundOn ? "Mute sound" : "Unmute sound"} onClick={() => setSoundOn((s) => !s)} className="hover-scale">
                     {soundOn ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
                   </Button>
@@ -598,19 +611,19 @@ const Game = () => {
               )}
             </header>
   
-            <section className="grid gap-6 md:grid-cols-[1fr,360px]">
+            <section className="grid gap-4 md:grid-cols-[1fr,360px]">
               <article>
                 <Card className="animate-fade-in bg-background/60 backdrop-blur-xl border border-border/60 shadow-[var(--shadow-elegant)]">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle className="text-xl">Your List</CardTitle>
-                    <div className="flex items-center gap-3">
+                  <CardHeader className="flex flex-row items-center justify-between sticky top-0 z-10 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                    <CardTitle className="text-lg sm:text-xl">Your List</CardTitle>
+                    <div className="flex items-center gap-2 sm:gap-3">
                       {roomCode && (running || showResults || votingActive || roundsPlayed > 0) && (
-                        <div className="rounded-full border px-3 py-1 text-xs">Round {displayRound}/{roundsPerMatch}</div>
+                        <div className="rounded-full border px-2 py-0.5 text-xs sm:px-3 sm:py-1">Round {displayRound}/{roundsPerMatch}</div>
                       )}
-                      <div className="rounded-full border px-4 py-2 text-lg font-semibold">
+                      <div className="rounded-full border px-3 py-1 text-base font-semibold hidden xs:block">
                         {letter ?? "–"}
                       </div>
-                      <div className="w-40">
+                      <div className="w-32 sm:w-40">
                         <Progress value={progress} />
                         <div className="text-xs text-muted-foreground mt-1">
                           {running ? `${timeLeft}s remaining` : "Timer idle"}
@@ -618,7 +631,7 @@ const Game = () => {
                       </div>
                       {votingActive && (
                         <div className="flex items-center gap-2">
-                          <span className="rounded-full border px-3 py-1 text-xs">Voting {voteTimeLeft}s</span>
+                          <span className="rounded-full border px-2 py-0.5 text-xs sm:px-3 sm:py-1">Voting {voteTimeLeft}s</span>
                           {isHost && (
                             <Button variant="secondary" size="sm" onClick={() => {
                               setVoteTimeLeft((t) => t + 5);
@@ -631,7 +644,7 @@ const Game = () => {
                       )}
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="pb-4 sm:pb-6">
                     <div className="grid gap-4">
                       {letter && running ? (
                         activeCategories.map((cat, idx) => (
@@ -661,15 +674,15 @@ const Game = () => {
                         <div className="text-sm text-muted-foreground">Categories will be revealed when the round starts.</div>
                       )}
                     </div>
-                    <div className="mt-6 flex items-center gap-3">
-                      <Button onClick={startRound} disabled={running || (!!roomCode && !isHost)} className="hover-scale">
-                        {running ? "Round Running" : "Start Round"}
+                    <div className="mt-4 sm:mt-6 flex items-center gap-2 sm:gap-3">
+                      <Button onClick={startRound} disabled={running || (!!roomCode && !isHost)} className="hover-scale w-full sm:w-auto">
+                        {primaryButtonLabel}
                       </Button>
-                      <Button variant="secondary" onClick={submitRound} disabled={!letter} className="hover-scale">
+                      <Button variant="secondary" onClick={submitRound} disabled={!letter} className="hover-scale w-full sm:w-auto">
                         Submit Round
                       </Button>
                       {roomCode && isHost && running && (
-                        <Button variant="outline" onClick={endRoundEarly} className="hover-scale">
+                        <Button variant="outline" onClick={endRoundEarly} className="hover-scale w-full sm:w-auto">
                           End Round (Host)
                         </Button>
                       )}

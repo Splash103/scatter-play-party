@@ -507,6 +507,10 @@ const Game = () => {
             if (!roundCommitted) commitRoundScores(true);
             setShowResults(false);
             setVotingActive(false);
+            const nextRoundNum = roundsPlayed + 1;
+            if (roomCode && nextRoundNum < roundsPerMatch) {
+              setTimeout(() => startRound(), 250);
+            }
           } else {
             setVotingActive(false);
           }
@@ -516,7 +520,7 @@ const Game = () => {
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [votingActive, voteSeconds, isHost, roundsPlayed, roundsPerMatch]);
+  }, [votingActive, voteSeconds, isHost, roundsPlayed, roundsPerMatch, roomCode]);
 
   return (
     <>
@@ -700,7 +704,7 @@ const Game = () => {
                       )}
                     </div>
                     <div className="mt-4 sm:mt-6 flex items-center gap-2 sm:gap-3">
-                      <Button onClick={startRound} disabled={running || roundStarting || (!!roomCode && !isHost)} className="hover-scale w-full sm:w-auto">
+                      <Button onClick={startRound} disabled={running || votingActive || roundStarting || (!!roomCode && !isHost)} className="hover-scale w-full sm:w-auto">
                         {primaryButtonLabel}
                       </Button>
                       {roomCode && isHost && running && (

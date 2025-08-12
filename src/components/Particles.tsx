@@ -30,7 +30,7 @@ export const Particles: React.FC<ParticlesProps> = ({ count = 24 }) => {
             width: p.size,
             height: p.size,
             filter: p.blur ? `blur(${p.blur}px)` : undefined,
-            background: `hsla(var(--primary), 0.18)`,
+            background: `hsl(var(--primary) / 0.18)`,
             animationDelay: `${p.delay}s`,
             animationDuration: `${p.duration}s`,
           }}

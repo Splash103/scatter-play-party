@@ -107,9 +107,12 @@ const Game = () => {
   }, [running, timeLeft, timer]);
 
   const displayRound = useMemo(() => {
-    if (running) return currentRoundIndex || Math.max(1, roundsPlayed + 1);
-    return Math.min(roundsPerMatch, Math.max(1, roundsPlayed + 1));
-  }, [running, currentRoundIndex, roundsPlayed, roundsPerMatch]);
+    if (running || showResults || votingActive) {
+      return currentRoundIndex || (roundsPlayed > 0 ? roundsPlayed : 1);
+    }
+    if (roundsPlayed >= roundsPerMatch) return roundsPerMatch;
+    return Math.max(1, roundsPlayed + 1);
+  }, [running, showResults, votingActive, currentRoundIndex, roundsPlayed, roundsPerMatch]);
 
   const primaryButtonLabel = useMemo(() => {
     if (running) return "Round Running";
@@ -252,6 +255,7 @@ const Game = () => {
         setRoundsPlayed(0);
         setLeaderId(null);
         setUsedListIds(new Set());
+        setCurrentRoundIndex(0);
       });
 
     channel.subscribe(async (status) => {
@@ -412,6 +416,7 @@ const Game = () => {
         setLeaderId(null);
         setUsedListIds(new Set());
         setRoundsPlayed(0);
+        setCurrentRoundIndex(0);
         // continue to start first round of new match
       }
     }

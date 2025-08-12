@@ -35,11 +35,7 @@
 
     --radius: 0.5rem;
 
-    /* Extras */
-    --gradient-hero: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
-    --shadow-elegant: 0 20px 50px -20px hsl(var(--primary));
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-
+    /* Extras removed for PostCSS compatibility */
     /* Sidebar */
     --sidebar-background: 0, 0%, 98%;
     --sidebar-foreground: 240, 5.3%, 26.1%;
@@ -94,4 +90,16 @@
 @layer base {
   * { @apply border-border; }
   body { @apply bg-background text-foreground font-sans; }
+}
+
+/* Safe utility classes */
+@layer utilities {
+  .hover-scale { @apply transition-transform duration-200 hover:scale-105; }
+  .pulse { @apply animate-pulse; }
+  .animate-fade-in { animation: fade-in 0.3s ease-out both; }
+}
+
+@keyframes fade-in {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
 }

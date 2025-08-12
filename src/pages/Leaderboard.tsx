@@ -1,31 +1,53 @@
 import { Helmet } from "react-helmet-async";
-import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { gradientFromString, initialsFromName } from "@/lib/gradient";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
-interface Entry {
-  name: string;
-  wins: number;
+interface Row {
+  user_id: string | null;
+  name: string | null;
+  avatar_url: string | null;
+  wins: number | null;
+  best_streak: number | null;
+  current_streak: number | null;
 }
 
 export default function Leaderboard() {
-  const profileName = localStorage.getItem("profileName") || "";
-  let entries: Entry[] = [];
+  const { data, isLoading } = useQuery({
+    queryKey: ["leaderboard"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("v_leaderboard")
+        .select("user_id,name,avatar_url,wins,best_streak,current_streak")
+        .order("wins", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data || []) as Row[];
+    },
+  });
 
-  try {
-    const raw = localStorage.getItem("leaderboard");
-    if (raw) entries = JSON.parse(raw) as Entry[];
-  } catch (_) {
-    entries = [];
+  let list: { name: string; wins: number; best_streak?: number; current_streak?: number }[] = [];
+  if (data && data.length > 0) {
+    list = data.map((r) => ({
+      name: r.name || "Player",
+      wins: r.wins || 0,
+      best_streak: r.best_streak || 0,
+      current_streak: r.current_streak || 0,
+    })).slice(0, 10);
+  } else {
+    // Fallback to local storage if no Supabase data
+    try {
+      const raw = localStorage.getItem("leaderboard");
+      const entries = raw ? JSON.parse(raw) as { name: string; wins: number }[] : [];
+      const map = new Map<string, { name: string; wins: number }>();
+      for (const e of entries) map.set(e.name, e);
+      list = Array.from(map.values()).sort((a, b) => b.wins - a.wins).slice(0, 10);
+    } catch {
+      list = [];
+    }
   }
-
-  // Ensure unique by name and sort desc
-  const map = new Map<string, Entry>();
-  for (const e of entries) map.set(e.name, e);
-  if (profileName && !map.has(profileName)) map.set(profileName, { name: profileName, wins: 0 });
-  const list = Array.from(map.values()).sort((a, b) => b.wins - a.wins).slice(0, 10);
 
   return (
     <>
@@ -41,7 +63,14 @@ export default function Leaderboard() {
             <h1 className="text-3xl font-bold tracking-tight">Leaderboard</h1>
           </header>
 
-          {list.length === 0 ? (
+          {isLoading ? (
+            <Card className="animate-fade-in">
+              <CardHeader>
+                <CardTitle>Loading…</CardTitle>
+                <CardDescription>Fetching top players.</CardDescription>
+              </CardHeader>
+            </Card>
+          ) : list.length === 0 ? (
             <Card className="animate-fade-in">
               <CardHeader>
                 <CardTitle>No scores yet</CardTitle>
@@ -51,7 +80,7 @@ export default function Leaderboard() {
           ) : (
             <div className="grid gap-4">
               {list.map((e, idx) => (
-                <Card key={e.name} className="hover-scale animate-fade-in">
+                <Card key={`${e.name}-${idx}`} className="hover-scale animate-fade-in">
                   <CardContent className="flex items-center gap-4 py-4">
                     <div className="w-10 text-center font-semibold text-muted-foreground">#{idx + 1}</div>
                     <Avatar>
@@ -61,7 +90,11 @@ export default function Leaderboard() {
                     </Avatar>
                     <div className="flex-1">
                       <div className="font-medium">{e.name}</div>
-                      <div className="text-sm text-muted-foreground">Wins: {e.wins}</div>
+                      <div className="text-sm text-muted-foreground flex gap-3">
+                        <span>Wins: {e.wins}</span>
+                        {typeof e.current_streak === "number" && <span>Streak: {e.current_streak}</span>}
+                        {typeof e.best_streak === "number" && <span>Best: {e.best_streak}</span>}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

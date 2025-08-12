@@ -822,27 +822,45 @@ const Game = () => {
         </main>
       </div>
       {roomCode && (
-        <ResultsOverlay
-          open={showResults}
-          onClose={() => setShowResults(false)}
-          results={results}
-          presentCount={presentCount}
-          votes={votes}
-          onVote={(key) => {
-            if (!channelRef.current) return;
-            channelRef.current.send({ type: 'broadcast', event: 'vote', payload: { key, voterId: playerId } });
-            setVotes((prev) => {
-              const set = new Set([...(prev[key] || [])]);
-              set.add(playerId);
-              return { ...prev, [key]: Array.from(set) };
-            });
-            playVote();
-          }}
-          categories={activeCategories}
-          localPlayerId={playerId}
-          voteTimeLeft={voteTimeLeft}
-          players={players}
-        />
+        <>
+          <ResultsOverlay
+            open={showResults}
+            onClose={() => setShowResults(false)}
+            results={results}
+            presentCount={presentCount}
+            votes={votes}
+            onVote={(key) => {
+              if (!channelRef.current) return;
+              channelRef.current.send({ type: 'broadcast', event: 'vote', payload: { key, voterId: playerId } });
+              setVotes((prev) => {
+                const set = new Set([...(prev[key] || [])]);
+                set.add(playerId);
+                return { ...prev, [key]: Array.from(set) };
+              });
+              playVote();
+            }}
+            categories={activeCategories}
+            localPlayerId={playerId}
+            voteTimeLeft={voteTimeLeft}
+            players={players}
+          />
+          <FinalScoreboard
+            open={finalOpen}
+            onClose={() => setFinalOpen(false)}
+            summary={matchSummary}
+            isHost={isHost}
+            onPlayAgain={() => {
+              setFinalOpen(false);
+              setMatchTotals({});
+              setStreaks({});
+              setLeaderId(null);
+              setUsedListIds(new Set());
+              setRoundsPlayed(0);
+              setCurrentRoundIndex(0);
+              startRound();
+            }}
+          />
+        </>
       )}
     </>
   );

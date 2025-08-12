@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ const Index = () => {
   const navigate = useNavigate();
   const [playOpen, setPlayOpen] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
+  useEffect(() => { /* keep types happy */ }, []);
 
   const createRoom = () => {
     const code = generateRoomCode();
@@ -55,9 +56,12 @@ const Index = () => {
         <Aurora />
         <Particles />
         <div className="relative z-10 w-full max-w-5xl mx-auto p-6 sm:p-10 rounded-lg border bg-background/60 backdrop-blur-xl shadow-[var(--shadow-elegant)]">
-          <div className="absolute right-4 top-4">
+          <div className="absolute right-4 top-4 flex items-center gap-2">
             <Button variant="secondary" size="icon" aria-label="Toggle theme" onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}>
               {resolvedTheme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <Button asChild variant="outline" size="sm" aria-label="Sign in or manage account">
+              <Link to="/auth">Account</Link>
             </Button>
           </div>
           <header className="text-center mb-8">
@@ -94,7 +98,7 @@ const Index = () => {
               <CardHeader className="flex-row items-center gap-2">
                 <UserCircle2 className="text-primary" />
                 <CardTitle>Your Profile</CardTitle>
-                <CardDescription>Set your display name and avatar.</CardDescription>
+                <CardDescription>Set your display name. Sign in to save wins.</CardDescription>
               </CardHeader>
               <CardContent className="flex items-center gap-3">
                 <Avatar>

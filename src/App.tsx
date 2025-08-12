@@ -11,6 +11,7 @@ import Leaderboard from "./pages/Leaderboard";
 import Lobby from "./pages/Lobby";
 import { ThemeProvider } from "next-themes";
 import HomeButton from "@/components/HomeButton";
+import Auth from "./pages/Auth";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
               <Route path="/game" element={<Game />} />
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/lobby" element={<Lobby />} />
+              <Route path="/auth" element={<Auth />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

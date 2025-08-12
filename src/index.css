@@ -42,6 +42,9 @@ All colors MUST be HSL.
     --gradient-hero: linear-gradient(135deg, hsl(var(--primary) / 0.06), hsl(var(--accent) / 0.35));
     --shadow-elegant: 0 20px 50px -20px hsl(var(--primary) / 0.35);
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Aurora glow colors */
+    --glow-1: 217.2 91.2% 59.8%; /* vibrant blue */
+    --glow-2: 199 89% 48%;       /* cyan blue */
 
     --sidebar-background: 0 0% 98%;
 

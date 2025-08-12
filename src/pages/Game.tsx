@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Settings } from "lucide-react";
 import Particles from "@/components/Particles";
+import Aurora from "@/components/Aurora";
 const DEFAULT_CATEGORIES = [
   "Fruits",
   "Countries",
@@ -190,6 +191,7 @@ const Game = () => {
         <link rel="canonical" href="/game" />
       </Helmet>
       <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-primary/10 via-accent/10 to-background">
+        <Aurora />
         <Particles />
         <main className="relative z-10 container mx-auto py-8">
           <div className="rounded-xl border border-border/60 bg-background/60 backdrop-blur-xl p-4 md:p-6 shadow-[var(--shadow-elegant)]">

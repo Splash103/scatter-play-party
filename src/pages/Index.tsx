@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { gradientFromString, initialsFromName } from "@/lib/gradient";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import Particles from "@/components/Particles";
+import Aurora from "@/components/Aurora";
 import { PlusCircle, Users, UserCircle2, Trophy, Gamepad2, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 const ROOM_ALPHABET = "ABCDEFGHJKMNPQRSTWXYZ";
@@ -51,6 +52,7 @@ const Index = () => {
         <link rel="canonical" href="/" />
       </Helmet>
       <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-accent/10 to-background overflow-hidden">
+        <Aurora />
         <Particles />
         <div className="relative z-10 w-full max-w-5xl mx-auto p-6 sm:p-10 rounded-lg border bg-background/60 backdrop-blur-xl shadow-[var(--shadow-elegant)]">
           <div className="absolute right-4 top-4">

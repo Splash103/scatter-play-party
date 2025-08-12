@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Minimal design tokens only (no gradients, no custom utilities) */
+/* Design system: all tokens in HSL */
 @layer base {
   :root {
     --background: 0, 0%, 100%;
@@ -34,6 +34,11 @@
     --ring: 222.2, 84%, 4.9%;
 
     --radius: 0.5rem;
+
+    /* Extras */
+    --gradient-hero: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
+    --shadow-elegant: 0 20px 50px -20px hsl(var(--primary));
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
     /* Sidebar */
     --sidebar-background: 0, 0%, 98%;
@@ -84,7 +89,9 @@
     --sidebar-border: 240, 3.7%, 15.9%;
     --sidebar-ring: 217.2, 91.2%, 59.8%;
   }
+}
 
+@layer base {
   * { @apply border-border; }
   body { @apply bg-background text-foreground font-sans; }
 }

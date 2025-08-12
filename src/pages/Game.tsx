@@ -233,6 +233,14 @@ const Game = () => {
           localStorage.setItem('leaderboard', JSON.stringify(updated));
         } catch (_) {}
         toast({ title: "Match over!", description: `Winner(s): ${p.winners.map((w) => w.name).join(', ')}` });
+        // Show final scoreboard to non-host clients too
+        if (!isHost) {
+          const currentPlayers = players.map((pl) => ({ id: pl.id, name: pl.name }));
+          const totals: Record<string, number> = { ...matchTotals };
+          for (const pl of currentPlayers) { if (totals[pl.id] === undefined) totals[pl.id] = 0; }
+          setMatchSummary({ winners: p.winners, totals, players: currentPlayers });
+          setFinalOpen(true);
+        }
         // Reset match state
         setMatchTotals({});
         setStreaks({});
@@ -273,11 +281,13 @@ const Game = () => {
     const perPlayerRoundScore: Record<string, number> = {};
     for (const r of Object.values(results)) {
       let score = 0;
+      const targetLetter = (r.letter || letter || '').toUpperCase();
       for (const [idxStr, ans] of Object.entries(r.answers || {})) {
         const idx = Number(idxStr);
         const key = `${r.playerId}:${idx}`;
         const dq = (votes[key]?.length || 0) >= majority;
-        if (!dq && ans && ans.trim().length > 0) score += 1;
+        const startsOk = !!ans && targetLetter && ans.trimStart().charAt(0).toUpperCase() === targetLetter;
+        if (!dq && startsOk) score += 1;
       }
       perPlayerRoundScore[r.playerId] = score;
       newTotals[r.playerId] = (newTotals[r.playerId] ?? 0) + score;
@@ -539,9 +549,7 @@ const Game = () => {
                         <div className="grid gap-2">
                           <Label>Rounds per match</Label>
                           <Select value={String(roundsPerMatch)} onValueChange={(v) => {
-                            let val = parseInt(v, 10);
-                            const max = CATEGORY_LISTS.length;
-                            if (val > max) val = max;
+                            const val = parseInt(v, 10);
                             setRoundsPerMatch(val);
                             if (roomCode && isHost) channelRef.current?.send({ type: 'broadcast', event: 'room_settings', payload: { timer, roundsPerMatch: val, voteSeconds } });
                           }} disabled={!!roomCode && !isHost}>
@@ -551,7 +559,7 @@ const Game = () => {
                             <SelectContent>
                               <SelectGroup>
                                 <SelectLabel>Rounds</SelectLabel>
-                                {[3,5,7].filter((n) => n <= CATEGORY_LISTS.length).map((n) => (
+                                {[3,5,7,9,10].map((n) => (
                                   <SelectItem key={n} value={String(n)}>{n} rounds</SelectItem>
                                 ))}
                               </SelectGroup>
@@ -633,7 +641,18 @@ const Game = () => {
                               id={`cat-${idx}`}
                               placeholder={letter ? `Starts with ${letter}` : "Start a round to get a letter"}
                               value={answers[idx] ?? ""}
-                              onChange={(e) => setAnswers((prev) => ({ ...prev, [idx]: e.target.value }))}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                if (!letter) return;
+                                if (v.length === 0) {
+                                  setAnswers((prev) => ({ ...prev, [idx]: "" }));
+                                  return;
+                                }
+                                const first = v.trimStart().charAt(0).toUpperCase();
+                                if (first === letter.toUpperCase()) {
+                                  setAnswers((prev) => ({ ...prev, [idx]: v }));
+                                }
+                              }}
                               disabled={!letter}
                             />
                           </div>

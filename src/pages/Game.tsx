@@ -185,8 +185,20 @@ const Game = () => {
         <meta name="description" content="Play Scattergories online in solo mode. Random letters, timed rounds, and 12 classic categories. Start a quick round now!" />
         <link rel="canonical" href="/game" />
       </Helmet>
+      {!roomCode && (
+        <div className="fixed right-4 top-4 z-50">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate("/")}
+            aria-label="Go home"
+          >
+            Home
+          </Button>
+        </div>
+      )}
       <main className="container mx-auto py-8">
-<header className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <header className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Scattergories Online — {roomCode ? "Room" : "Solo"}</h1>
             <p className="text-muted-foreground mt-1">12 categories • one letter • beat the clock</p>

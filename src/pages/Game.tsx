@@ -84,6 +84,8 @@ const Game = () => {
     winners: { id: string; name: string; total: number }[];
     totals: Record<string, number>;
   } | null>(null);
+  const [voteSeconds, setVoteSeconds] = useState<number>(15);
+  const [voteTimeLeft, setVoteTimeLeft] = useState<number>(0);
   const leaveRoom = () => {
     navigate("/");
     toast({ title: "Left room", description: "You returned to the main menu." });
@@ -151,7 +153,7 @@ const Game = () => {
         setVotes({});
         setShowResults(false);
         setRoundCommitted(false);
-        setRoundsPlayed(p.roundIndex);
+        /* round index received: p.roundIndex; keep roundsPlayed as completed rounds */
         toast({ title: "Round started", description: `Letter: ${p.letter} • ${p.timer} seconds` });
       })
       .on('broadcast', { event: 'round_submit' }, ({ payload }) => {
@@ -175,11 +177,16 @@ const Game = () => {
           return { ...prev, [key]: Array.from(set) };
         });
       })
+      .on('broadcast', { event: 'vote_extend' }, ({ payload }) => {
+        const { add } = payload as { add: number };
+        setVoteTimeLeft((t) => t + (add || 0));
+      })
       .on('broadcast', { event: 'room_settings' }, ({ payload }) => {
-        const p = payload as { timer: number; roundsPerMatch: number };
+        const p = payload as { timer: number; roundsPerMatch: number; voteSeconds?: number };
         setTimer(p.timer);
         setRoundsPerMatch(p.roundsPerMatch);
-        toast({ title: "Room settings updated", description: `Timer ${p.timer}s • Rounds ${p.roundsPerMatch}` });
+        if (typeof p.voteSeconds === 'number') setVoteSeconds(p.voteSeconds);
+        toast({ title: "Room settings updated", description: `Timer ${p.timer}s • Rounds ${p.roundsPerMatch}${typeof p.voteSeconds === 'number' ? ` • Voting ${p.voteSeconds}s` : ''}` });
       })
       .on('broadcast', { event: 'scores_state' }, ({ payload }) => {
         const p = payload as { matchTotals: Record<string, number>; streaks: Record<string, number>; roundsPlayed: number; leaderId: string | null };
@@ -225,7 +232,7 @@ const Game = () => {
   // Host: broadcast current settings/scores when becoming host or on subscribe
   useEffect(() => {
     if (!roomCode || !channelRef.current || !isHost) return;
-    channelRef.current.send({ type: 'broadcast', event: 'room_settings', payload: { timer, roundsPerMatch } });
+    channelRef.current.send({ type: 'broadcast', event: 'room_settings', payload: { timer, roundsPerMatch, voteSeconds } });
     channelRef.current.send({ type: 'broadcast', event: 'scores_state', payload: { matchTotals, streaks, roundsPlayed, leaderId } });
   }, [roomCode, isHost]);
 
@@ -389,6 +396,28 @@ const Game = () => {
     channelRef.current.send({ type: 'broadcast', event: 'round_end', payload: {} });
     setShowResults(true);
   };
+  useEffect(() => {
+    if (!showResults) { setVoteTimeLeft(0); return; }
+    setVoteTimeLeft(voteSeconds);
+    const id = setInterval(() => {
+      setVoteTimeLeft((t) => {
+        if (t <= 1) {
+          clearInterval(id);
+          if (isHost) {
+            if (!roundCommitted) commitRoundScores();
+            setShowResults(false);
+            if (roundsPlayed + 1 < roundsPerMatch) {
+              startRound();
+            }
+          }
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [showResults, voteSeconds, isHost, roundsPlayed, roundsPerMatch]);
+
   return (
     <>
       <Helmet>
@@ -436,7 +465,7 @@ const Game = () => {
                           <Select value={String(timer)} onValueChange={(v) => {
                             const val = parseInt(v, 10);
                             setTimer(val);
-                            if (roomCode && isHost) channelRef.current?.send({ type: 'broadcast', event: 'room_settings', payload: { timer: val, roundsPerMatch } });
+                            if (roomCode && isHost) channelRef.current?.send({ type: 'broadcast', event: 'room_settings', payload: { timer: val, roundsPerMatch, voteSeconds } });
                           }} disabled={!!roomCode && !isHost}>
                             <SelectTrigger>
                               <SelectValue placeholder="Select duration" />
@@ -458,7 +487,7 @@ const Game = () => {
                             const max = CATEGORY_LISTS.length;
                             if (val > max) val = max;
                             setRoundsPerMatch(val);
-                            if (roomCode && isHost) channelRef.current?.send({ type: 'broadcast', event: 'room_settings', payload: { timer, roundsPerMatch: val } });
+                            if (roomCode && isHost) channelRef.current?.send({ type: 'broadcast', event: 'room_settings', payload: { timer, roundsPerMatch: val, voteSeconds } });
                           }} disabled={!!roomCode && !isHost}>
                             <SelectTrigger>
                               <SelectValue placeholder="Select rounds" />
@@ -468,6 +497,26 @@ const Game = () => {
                                 <SelectLabel>Rounds</SelectLabel>
                                 {[3,5,7].filter((n) => n <= CATEGORY_LISTS.length).map((n) => (
                                   <SelectItem key={n} value={String(n)}>{n} rounds</SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Voting window</Label>
+                          <Select value={String(voteSeconds)} onValueChange={(v) => {
+                            const val = parseInt(v, 10);
+                            setVoteSeconds(val);
+                            if (roomCode && isHost) channelRef.current?.send({ type: 'broadcast', event: 'room_settings', payload: { timer, roundsPerMatch, voteSeconds: val } });
+                          }} disabled={!!roomCode && !isHost}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select voting time" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                <SelectLabel>Voting</SelectLabel>
+                                {[10,15,20].map((n) => (
+                                  <SelectItem key={n} value={String(n)}>{n} seconds</SelectItem>
                                 ))}
                               </SelectGroup>
                             </SelectContent>
@@ -492,7 +541,7 @@ const Game = () => {
                     <CardTitle className="text-xl">Your List</CardTitle>
                     <div className="flex items-center gap-3">
                       {roomCode && (running || showResults || roundsPlayed > 0) && (
-                        <div className="rounded-full border px-3 py-1 text-xs">Round {Math.max(1, roundsPlayed)}/{roundsPerMatch}</div>
+                        <div className="rounded-full border px-3 py-1 text-xs">Round {roundsPlayed + (running || showResults ? 1 : 0)}/{roundsPerMatch}</div>
                       )}
                       <div className="rounded-full border px-4 py-2 text-lg font-semibold">
                         {letter ?? "–"}
@@ -503,6 +552,19 @@ const Game = () => {
                           {running ? `${timeLeft}s remaining` : "Timer idle"}
                         </div>
                       </div>
+                      {showResults && (
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full border px-3 py-1 text-xs">Voting {voteTimeLeft}s</span>
+                          {isHost && (
+                            <Button variant="secondary" size="sm" onClick={() => {
+                              setVoteTimeLeft((t) => t + 5);
+                              channelRef.current?.send({ type: 'broadcast', event: 'vote_extend', payload: { add: 5 } });
+                            }}>
+                              +5s
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -531,6 +593,11 @@ const Game = () => {
                       <Button variant="secondary" onClick={submitRound} disabled={!letter} className="hover-scale">
                         Submit Round
                       </Button>
+                      {roomCode && isHost && running && (
+                        <Button variant="outline" onClick={endRoundEarly} className="hover-scale">
+                          End Round (Host)
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -624,7 +691,7 @@ const Game = () => {
       {roomCode && (
         <ResultsOverlay
           open={showResults}
-          onClose={() => setShowResults(false)}
+          onClose={() => {}}
           results={results}
           presentCount={presentCount}
           votes={votes}

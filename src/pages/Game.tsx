@@ -334,8 +334,6 @@ const Game = () => {
       .map(([id]) => id);
 
     // Keep streaks unchanged during rounds
-    const nextStreaks: Record<string, number> = { ...streaks };
-
     // Compute leader by totals (tie => null)
     let nextLeader: string | null = null;
     let maxTotal = -1;

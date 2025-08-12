@@ -15,9 +15,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { gradientFromString, initialsFromName } from "@/lib/gradient";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Settings } from "lucide-react";
+import { Settings, Crown, Flame } from "lucide-react";
 import Particles from "@/components/Particles";
 import Aurora from "@/components/Aurora";
+import { CATEGORY_LISTS } from "@/data/categoryLists";
 const DEFAULT_CATEGORIES = [
   "Fruits",
   "Countries",
@@ -46,9 +47,6 @@ const Game = () => {
   const [timeLeft, setTimeLeft] = useState<number>(180);
   const [running, setRunning] = useState(false);
   const [letter, setLetter] = useState<string | null>(null);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
-  const total = DEFAULT_CATEGORIES.length;
-
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const roomCode: string | null = ((searchParams.get("room") || "").toUpperCase()) || null;
@@ -65,11 +63,22 @@ const Game = () => {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [presentCount, setPresentCount] = useState<number>(1);
-  const [players, setPlayers] = useState<{ id: string; name: string }[]>([]);
+  const [players, setPlayers] = useState<{ id: string; name: string; online_at?: string }[]>([]);
   const [results, setResults] = useState<Record<string, PlayerResult>>({});
   const [votes, setVotes] = useState<Record<string, string[]>>({});
   const [showResults, setShowResults] = useState(false);
 
+  // Match state (multiplayer)
+  const [roundsPerMatch, setRoundsPerMatch] = useState<number>(5);
+  const [roundsPlayed, setRoundsPlayed] = useState<number>(0);
+  const [activeCategories, setActiveCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [usedListIds, setUsedListIds] = useState<Set<string>>(new Set());
+  const [matchTotals, setMatchTotals] = useState<Record<string, number>>({});
+  const [streaks, setStreaks] = useState<Record<string, number>>({});
+  const [leaderId, setLeaderId] = useState<string | null>(null);
+  const [hostId, setHostId] = useState<string | null>(null);
+  const [roundCommitted, setRoundCommitted] = useState<boolean>(false);
+  const isHost = Boolean(roomCode) && hostId === playerId;
   const leaveRoom = () => {
     navigate("/");
     toast({ title: "Left room", description: "You returned to the main menu." });
@@ -109,23 +118,33 @@ const Game = () => {
 
     channel
       .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState() as Record<string, { id: string; name: string }[]>;
-        const list = Object.entries(state).map(([key, presences]) => ({ id: key, name: presences?.[0]?.name || 'Player' }));
+        const state = channel.presenceState() as Record<string, { id: string; name: string; online_at?: string }[]>;
+        const list = Object.entries(state).map(([key, presences]) => ({
+          id: key,
+          name: presences?.[0]?.name || 'Player',
+          online_at: presences?.[0]?.online_at,
+        }));
         setPlayers(list);
         setPresentCount(list.length || 1);
+        const withTs = list.map((p) => ({ ...p, ts: Date.parse(p.online_at || '') || Date.now() }));
+        withTs.sort((a, b) => a.ts - b.ts);
+        setHostId(withTs[0]?.id ?? null);
       })
       .on('broadcast', { event: 'chat' }, ({ payload }) => {
         setMessages((m) => [...m, payload as ChatMessage].slice(-200));
       })
       .on('broadcast', { event: 'round_start' }, ({ payload }) => {
-        const p = payload as { letter: string; timer: number };
+        const p = payload as { letter: string; timer: number; categories: string[]; roundIndex: number };
         setLetter(p.letter);
         setAnswers({});
+        setActiveCategories(p.categories);
         setTimeLeft(p.timer);
         setRunning(true);
         setResults({});
         setVotes({});
         setShowResults(false);
+        setRoundCommitted(false);
+        setRoundsPlayed(p.roundIndex);
         toast({ title: "Round started", description: `Letter: ${p.letter} • ${p.timer} seconds` });
       })
       .on('broadcast', { event: 'round_submit' }, ({ payload }) => {
@@ -142,6 +161,40 @@ const Game = () => {
           set.add(voterId);
           return { ...prev, [key]: Array.from(set) };
         });
+      })
+      .on('broadcast', { event: 'room_settings' }, ({ payload }) => {
+        const p = payload as { timer: number; roundsPerMatch: number };
+        setTimer(p.timer);
+        setRoundsPerMatch(p.roundsPerMatch);
+        toast({ title: "Room settings updated", description: `Timer ${p.timer}s • Rounds ${p.roundsPerMatch}` });
+      })
+      .on('broadcast', { event: 'scores_state' }, ({ payload }) => {
+        const p = payload as { matchTotals: Record<string, number>; streaks: Record<string, number>; roundsPlayed: number; leaderId: string | null };
+        setMatchTotals(p.matchTotals);
+        setStreaks(p.streaks);
+        setRoundsPlayed(p.roundsPlayed);
+        setLeaderId(p.leaderId ?? null);
+      })
+      .on('broadcast', { event: 'match_end' }, ({ payload }) => {
+        const p = payload as { winners: { id: string; name: string; total: number }[] };
+        // Update local leaderboard
+        try {
+          const raw = localStorage.getItem('leaderboard');
+          const existing = raw ? (JSON.parse(raw) as { name: string; wins: number }[]) : [];
+          const map = new Map(existing.map((e) => [e.name, e.wins] as const));
+          for (const w of p.winners) {
+            map.set(w.name, (map.get(w.name) ?? 0) + 1);
+          }
+          const updated = Array.from(map.entries()).map(([name, wins]) => ({ name, wins }));
+          localStorage.setItem('leaderboard', JSON.stringify(updated));
+        } catch (_) {}
+        toast({ title: "Match over!", description: `Winner(s): ${p.winners.map((w) => w.name).join(', ')}` });
+        // Reset match state
+        setMatchTotals({});
+        setStreaks({});
+        setRoundsPlayed(0);
+        setLeaderId(null);
+        setUsedListIds(new Set());
       });
 
     channel.subscribe(async (status) => {
@@ -156,7 +209,129 @@ const Game = () => {
     };
   }, [roomCode, playerId, profileName]);
 
+  // Host: broadcast current settings/scores when becoming host or on subscribe
+  useEffect(() => {
+    if (!roomCode || !channelRef.current || !isHost) return;
+    channelRef.current.send({ type: 'broadcast', event: 'room_settings', payload: { timer, roundsPerMatch } });
+    channelRef.current.send({ type: 'broadcast', event: 'scores_state', payload: { matchTotals, streaks, roundsPlayed, leaderId } });
+  }, [roomCode, isHost]);
+
+  // Compute majority threshold for disqualification
+  const majority = useMemo(() => Math.floor(presentCount / 2) + 1, [presentCount]);
+
+  // Host-only: commit round scores based on current results and votes
+  const commitRoundScores = () => {
+    if (!roomCode || !isHost) return;
+    if (roundCommitted) return;
+    // Tally round scores
+    const newTotals = { ...matchTotals };
+    const nextStreaks: Record<string, number> = { ...streaks };
+    const perPlayerRoundScore: Record<string, number> = {};
+    for (const r of Object.values(results)) {
+      let score = 0;
+      for (const [idxStr, ans] of Object.entries(r.answers || {})) {
+        const idx = Number(idxStr);
+        const key = `${r.playerId}:${idx}`;
+        const dq = (votes[key]?.length || 0) >= majority;
+        if (!dq && ans && ans.trim().length > 0) score += 1;
+      }
+      perPlayerRoundScore[r.playerId] = score;
+      newTotals[r.playerId] = (newTotals[r.playerId] ?? 0) + score;
+    }
+    // Determine round winners
+    const maxScore = Math.max(0, ...Object.values(perPlayerRoundScore));
+    const winners = Object.entries(perPlayerRoundScore)
+      .filter(([, s]) => s === maxScore)
+      .map(([id]) => id);
+    // Update streaks
+    const allPlayerIds = new Set<string>([...Object.keys(newTotals), ...players.map((p) => p.id)]);
+    for (const id of allPlayerIds) {
+      if (winners.includes(id)) nextStreaks[id] = (nextStreaks[id] ?? 0) + 1;
+      else nextStreaks[id] = 0;
+    }
+    // Compute leader by totals (tie => null)
+    let nextLeader: string | null = null;
+    let maxTotal = -1;
+    let tie = false;
+    for (const [id, tot] of Object.entries(newTotals)) {
+      if (tot > maxTotal) { maxTotal = tot; nextLeader = id; tie = false; }
+      else if (tot === maxTotal) { tie = true; }
+    }
+    if (tie) nextLeader = null;
+
+    setMatchTotals(newTotals);
+    setStreaks(nextStreaks);
+    setRoundsPlayed((n) => n + 1);
+    setLeaderId(nextLeader);
+    setRoundCommitted(true);
+
+    // Broadcast state
+    channelRef.current?.send({ type: 'broadcast', event: 'scores_state', payload: {
+      matchTotals: newTotals,
+      streaks: nextStreaks,
+      roundsPlayed: roundsPlayed + 1,
+      leaderId: nextLeader,
+    }});
+
+    // Auto end match if done
+    const done = roundsPlayed + 1 >= roundsPerMatch;
+    if (done) endMatch(newTotals);
+  };
+
+  const endMatch = (totalsArg?: Record<string, number>) => {
+    if (!roomCode || !isHost) return;
+    const totals = totalsArg ?? matchTotals;
+    const maxTotal = Math.max(0, ...Object.values(totals));
+    const winners = Object.entries(totals).filter(([, t]) => t === maxTotal).map(([id]) => {
+      const name = players.find((p) => p.id === id)?.name || 'Player';
+      return { id, name, total: maxTotal };
+    });
+    channelRef.current?.send({ type: 'broadcast', event: 'match_end', payload: { winners } });
+    // Local reset handled in listener; ensure local host reset too
+    setMatchTotals({});
+    setStreaks({});
+    setRoundsPlayed(0);
+    setLeaderId(null);
+    setUsedListIds(new Set());
+  };
+
+  const selectNextList = (): { id: string; categories: string[] } | null => {
+    const available = CATEGORY_LISTS.filter((l) => !usedListIds.has(l.id));
+    if (available.length === 0) return null;
+    const pick = available[Math.floor(Math.random() * available.length)];
+    return { id: pick.id, categories: pick.categories };
+  };
+
   const startRound = () => {
+    if (roomCode && !isHost) {
+      toast({ title: "Host only", description: "Only the host can start a round." });
+      return;
+    }
+    if (roomCode) {
+      if (showResults && !roundCommitted) {
+        commitRoundScores();
+      }
+      if (roundsPlayed >= roundsPerMatch) {
+        toast({ title: "Match complete", description: "Start a new match from settings." });
+        return;
+      }
+    }
+
+    // Pick categories for this round
+    let categories = activeCategories;
+    let listId: string | null = null;
+    if (roomCode) {
+      const next = selectNextList();
+      if (!next) {
+        toast({ title: "No lists left", description: "All lists used this match." });
+        return;
+      }
+      categories = next.categories;
+      listId = next.id;
+      setActiveCategories(categories);
+      setUsedListIds((prev) => new Set(prev).add(next.id));
+    }
+
     const l = randomLetter();
     setLetter(l);
     setAnswers({});
@@ -165,11 +340,14 @@ const Game = () => {
     setResults({});
     setVotes({});
     setShowResults(false);
+    setRoundCommitted(false);
+    const roundIndex = roundsPlayed + 1;
     toast({ title: "Round started", description: `Letter: ${l} • ${timer} seconds` });
     if (roomCode && channelRef.current) {
-      channelRef.current.send({ type: 'broadcast', event: 'round_start', payload: { letter: l, timer } });
+      channelRef.current.send({ type: 'broadcast', event: 'round_start', payload: { letter: l, timer, categories, roundIndex } });
     }
   };
+
   const submitRound = () => {
     setRunning(false);
     const r: PlayerResult = { playerId, name: profileName, letter, answers } as PlayerResult;
@@ -179,10 +357,10 @@ const Game = () => {
       channelRef.current.send({ type: 'broadcast', event: 'round_end', payload: {} });
     }
     setShowResults(true);
-    const score = Object.values(answers).filter((a) => a && a.trim().length > 0).length;
-    toast({ title: "Round submitted", description: `You filled ${score}/${total} categories.` });
+    const totalFilled = Object.values(answers).filter((a) => a && a.trim().length > 0).length;
+    const totalCats = activeCategories.length;
+    toast({ title: "Round submitted", description: `You filled ${totalFilled}/${totalCats} categories.` });
   };
-
   return (
     <>
       <Helmet>
@@ -222,12 +400,16 @@ const Game = () => {
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>Room Settings</DialogTitle>
-                        <DialogDescription>Adjust round options for this session.</DialogDescription>
+                        <DialogDescription>Host-only. Applies to everyone instantly.</DialogDescription>
                       </DialogHeader>
                       <div className="grid gap-4">
                         <div className="grid gap-2">
                           <Label>Timer</Label>
-                          <Select value={String(timer)} onValueChange={(v) => setTimer(parseInt(v, 10))}>
+                          <Select value={String(timer)} onValueChange={(v) => {
+                            const val = parseInt(v, 10);
+                            setTimer(val);
+                            if (roomCode && isHost) channelRef.current?.send({ type: 'broadcast', event: 'room_settings', payload: { timer: val, roundsPerMatch } });
+                          }} disabled={!!roomCode && !isHost}>
                             <SelectTrigger>
                               <SelectValue placeholder="Select duration" />
                             </SelectTrigger>
@@ -241,9 +423,31 @@ const Game = () => {
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          These settings apply locally. Use chat to align with players.
+                        <div className="grid gap-2">
+                          <Label>Rounds per match</Label>
+                          <Select value={String(roundsPerMatch)} onValueChange={(v) => {
+                            let val = parseInt(v, 10);
+                            const max = CATEGORY_LISTS.length;
+                            if (val > max) val = max;
+                            setRoundsPerMatch(val);
+                            if (roomCode && isHost) channelRef.current?.send({ type: 'broadcast', event: 'room_settings', payload: { timer, roundsPerMatch: val } });
+                          }} disabled={!!roomCode && !isHost}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select rounds" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                <SelectLabel>Rounds</SelectLabel>
+                                {[3,5,7].filter((n) => n <= CATEGORY_LISTS.length).map((n) => (
+                                  <SelectItem key={n} value={String(n)}>{n} rounds</SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
                         </div>
+                        {!!roomCode && !isHost && (
+                          <div className="text-sm text-muted-foreground">Only the host can change settings.</div>
+                        )}
                       </div>
                     </DialogContent>
                   </Dialog>
@@ -272,7 +476,7 @@ const Game = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="grid gap-4">
-                      {DEFAULT_CATEGORIES.map((cat, idx) => (
+                      {activeCategories.map((cat, idx) => (
                         <div key={idx} className="grid gap-2">
                           <Label htmlFor={`cat-${idx}`}>{idx + 1}. {cat}</Label>
                           <Input
@@ -286,7 +490,7 @@ const Game = () => {
                       ))}
                     </div>
                     <div className="mt-6 flex items-center gap-3">
-                      <Button onClick={startRound} disabled={running} className="hover-scale">
+                      <Button onClick={startRound} disabled={running || (!!roomCode && !isHost)} className="hover-scale">
                         {running ? "Round Running" : "Start Round"}
                       </Button>
                       <Button variant="secondary" onClick={submitRound} disabled={!letter} className="hover-scale">
@@ -347,7 +551,8 @@ const Game = () => {
                                     </AvatarFallback>
                                   </Avatar>
                                   <div className="text-sm">
-                                    <div className="font-medium">
+                                    <div className="font-medium flex items-center gap-1">
+                                      {p.id === hostId ? <Crown className="h-3.5 w-3.5 text-primary" aria-label="Host" /> : null}
                                       {p.name} {p.id === playerId ? <span className="text-muted-foreground">(You)</span> : null}
                                     </div>
                                   </div>
@@ -369,6 +574,9 @@ const Game = () => {
                           setMessages((m) => [...m, payload].slice(-200));
                         }}
                         currentName={profileName}
+                        hostId={hostId}
+                        leaderId={leaderId ?? undefined}
+                        streaks={streaks}
                       />
                     </div>
                   </>
@@ -394,7 +602,7 @@ const Game = () => {
               return { ...prev, [key]: Array.from(set) };
             });
           }}
-          categories={DEFAULT_CATEGORIES}
+          categories={activeCategories}
           localPlayerId={playerId}
         />
       )}

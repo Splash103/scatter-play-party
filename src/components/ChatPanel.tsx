@@ -55,13 +55,13 @@ export function ChatPanel({
               const isYou = m.name === currentName;
               const isHost = hostId && m.id === hostId;
               const s = streaks[m.id] ?? 0;
-              const isLeader = leaderId && m.id === leaderId && s > 0;
+              const isStreak = s > 0;
               return (
                 <div key={i} className="text-sm flex items-center gap-1">
                   <span className="font-medium flex items-center gap-1">
                     {isHost ? <Crown className="h-3.5 w-3.5 text-primary" aria-label="Host" /> : null}
                     {isYou ? "You" : m.name}
-                    {isLeader ? (
+                    {isStreak ? (
                       <span className="inline-flex items-center gap-0.5 text-xs text-primary">
                         <Flame className="h-3.5 w-3.5" aria-label="Win streak" />
                         ×{s}

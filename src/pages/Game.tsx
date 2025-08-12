@@ -15,10 +15,12 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { gradientFromString, initialsFromName } from "@/lib/gradient";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Settings, Crown, Flame } from "lucide-react";
+import { Settings, Crown, Flame, Volume2, VolumeX } from "lucide-react";
 import Particles from "@/components/Particles";
 import Aurora from "@/components/Aurora";
 import { CATEGORY_LISTS, generateRandomList } from "@/data/categoryLists";
+import { FinalScoreboard } from "@/components/FinalScoreboard";
+import { useGameSounds } from "@/hooks/use-sound";
 const DEFAULT_CATEGORIES = [
   "Fruits",
   "Countries",
@@ -83,10 +85,17 @@ const Game = () => {
   const [matchSummary, setMatchSummary] = useState<{
     winners: { id: string; name: string; total: number }[];
     totals: Record<string, number>;
+    players: { id: string; name: string }[];
   } | null>(null);
+  const [finalOpen, setFinalOpen] = useState<boolean>(false);
   const [voteSeconds, setVoteSeconds] = useState<number>(15);
   const [voteTimeLeft, setVoteTimeLeft] = useState<number>(0);
   const [votingActive, setVotingActive] = useState<boolean>(false);
+  const [soundOn, setSoundOn] = useState<boolean>(() => {
+    try { return JSON.parse(localStorage.getItem('soundOn') ?? 'true'); } catch { return true; }
+  });
+  useEffect(() => { localStorage.setItem('soundOn', JSON.stringify(soundOn)); }, [soundOn]);
+  const { playRoundStart, playVote, playWin } = useGameSounds(soundOn);
   const leaveRoom = () => {
     navigate("/");
     toast({ title: "Left room", description: "You returned to the main menu." });
@@ -159,6 +168,7 @@ const Game = () => {
         setRoundCommitted(false);
         /* round index received: p.roundIndex; keep roundsPlayed as completed rounds */
         toast({ title: "Round started", description: `Letter: ${p.letter} • ${p.timer} seconds` });
+        playRoundStart();
       })
       .on('broadcast', { event: 'round_submit' }, ({ payload }) => {
         const r = payload as PlayerResult;
@@ -245,7 +255,7 @@ const Game = () => {
   const majority = useMemo(() => Math.floor(presentCount / 2) + 1, [presentCount]);
 
   // Host-only: commit round scores based on current results and votes
-  const commitRoundScores = () => {
+  const commitRoundScores = (autoAdvance = false) => {
     if (!roomCode || !isHost) return;
     if (roundCommitted) return;
     // Tally round scores
@@ -306,19 +316,43 @@ const Game = () => {
 
   const endMatch = (totalsArg?: Record<string, number>) => {
     if (!roomCode || !isHost) return;
-    const totals = totalsArg ?? matchTotals;
+    const currentPlayers = players.map((p) => ({ id: p.id, name: p.name }));
+    const totalsRaw = totalsArg ?? matchTotals;
+    // Ensure all players are present in totals
+    const totals: Record<string, number> = { ...totalsRaw };
+    for (const p of currentPlayers) { if (totals[p.id] === undefined) totals[p.id] = 0; }
+
     const maxTotal = Math.max(0, ...Object.values(totals));
     const winners = Object.entries(totals).filter(([, t]) => t === maxTotal).map(([id]) => {
       const name = players.find((p) => p.id === id)?.name || 'Player';
       return { id, name, total: maxTotal };
     });
+
+    // Update streaks at MATCH end (not per round)
+    const newStreaks: Record<string, number> = { ...streaks };
+    const winnerIds = new Set(winners.map((w) => w.id));
+    for (const p of currentPlayers) {
+      if (winnerIds.has(p.id)) newStreaks[p.id] = (newStreaks[p.id] ?? 0) + 1; else newStreaks[p.id] = 0;
+    }
+
+    // Open final scoreboard locally
+    setMatchSummary({ winners, totals, players: currentPlayers });
+    setFinalOpen(true);
+    playWin();
+
+    // Broadcast to room
     channelRef.current?.send({ type: 'broadcast', event: 'match_end', payload: { winners } });
-    // Local reset handled in listener; ensure local host reset too
-    setMatchTotals({});
-    setStreaks({});
+    channelRef.current?.send({ type: 'broadcast', event: 'scores_state', payload: {
+      matchTotals: totals,
+      streaks: newStreaks,
+      roundsPlayed: 0,
+      leaderId: null,
+    }});
+
+    // Update local state for next match (keep totals for scoreboard until reset)
+    setStreaks(newStreaks);
     setRoundsPlayed(0);
     setLeaderId(null);
-    setUsedListIds(new Set());
   };
 
   const selectNextList = (): { id: string; categories: string[] } | null => {
@@ -412,12 +446,9 @@ const Game = () => {
         if (t <= 1) {
           clearInterval(id);
           if (isHost) {
-            if (!roundCommitted) commitRoundScores();
+            if (!roundCommitted) commitRoundScores(true);
             setShowResults(false);
             setVotingActive(false);
-            if (roundsPlayed + 1 < roundsPerMatch) {
-              startRound();
-            }
           } else {
             setVotingActive(false);
           }
@@ -459,6 +490,10 @@ const Game = () => {
                   </div>
                   <span className="rounded-full border px-3 py-1 text-sm">Room {roomCode} • {presentCount} online</span>
   
+                  <Button variant="ghost" size="icon" aria-label={soundOn ? "Mute sound" : "Unmute sound"} onClick={() => setSoundOn((s) => !s)} className="hover-scale">
+                    {soundOn ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+                  </Button>
+
                   <Dialog>
                     <DialogTrigger asChild>
                       <Button variant="ghost" size="icon" aria-label="Room settings" className="hover-scale">
@@ -714,6 +749,7 @@ const Game = () => {
               set.add(playerId);
               return { ...prev, [key]: Array.from(set) };
             });
+            playVote();
           }}
           categories={activeCategories}
           localPlayerId={playerId}

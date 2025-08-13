@@ -5,26 +5,15 @@ import Particles from "@/components/Particles";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Users, RefreshCw } from "lucide-react";
+import { usePublicRoomsList } from "@/hooks/usePublicRoomsList";
 
-interface Room {
-  id: string;
-  code: string;
-  name: string;
-  players: number;
-  maxPlayers: number;
-}
-
-const mockRooms: Room[] = [
-  { id: "1", code: "ABCD", name: "Friday Night Fun", players: 3, maxPlayers: 8 },
-  { id: "2", code: "QWER", name: "Speed Round", players: 2, maxPlayers: 6 },
-  { id: "3", code: "ZXCV", name: "Casual Lobby", players: 5, maxPlayers: 8 },
-];
 
 const Lobby = () => {
   const navigate = useNavigate();
   const [joinCode, setJoinCode] = useState("");
-  const rooms = useMemo(() => mockRooms, []);
+  const { rooms, syncNow } = usePublicRoomsList();
 
   const join = (code: string) => {
     const c = code.trim().toUpperCase();
@@ -61,13 +50,16 @@ const Lobby = () => {
               <div className="grid gap-3 sm:grid-cols-2">
                 {rooms.map((r) => (
                   <div
-                    key={r.id}
+                    key={r.code}
                     className="group rounded-lg border bg-card/70 p-4 backdrop-blur transition-transform duration-200 hover:scale-[1.02]"
                   >
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-sm text-muted-foreground">Code {r.code}</div>
-                        <div className="text-base font-medium">{r.name}</div>
+                        <div className="text-base font-medium flex items-center gap-2">
+                          {r.name}
+                          {r.inMatch ? <Badge variant="secondary">In match</Badge> : <Badge variant="secondary">Open</Badge>}
+                        </div>
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {r.players}/{r.maxPlayers}
@@ -83,7 +75,7 @@ const Lobby = () => {
               </div>
             </CardContent>
             <CardFooter>
-              <Button variant="secondary" size="sm">
+              <Button variant="secondary" size="sm" onClick={syncNow} aria-label="Refresh rooms">
                 <RefreshCw className="mr-2 h-4 w-4" /> Refresh
               </Button>
             </CardFooter>

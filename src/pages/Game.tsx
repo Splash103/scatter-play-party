@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Switch } from "@/components/ui/switch";
+import { usePublicRoomAdvertiser } from "@/hooks/usePublicRoomAdvertiser";
 import { ChatPanel, ChatMessage } from "@/components/ChatPanel";
 import { ResultsOverlay, PlayerResult } from "@/components/ResultsOverlay";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -84,9 +86,12 @@ const Game = () => {
     if (typeof window !== 'undefined') localStorage.setItem('playerId', id);
     return id;
   });
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [presentCount, setPresentCount] = useState<number>(1);
+const createdAtRef = useRef<string>(new Date().toISOString());
+const [roomName, setRoomName] = useState<string>(() => `${(profileName || 'Player')}'s Room`);
+const [publicListing, setPublicListing] = useState<boolean>(false);
+const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+const [messages, setMessages] = useState<ChatMessage[]>([]);
+const [presentCount, setPresentCount] = useState<number>(1);
   const [players, setPlayers] = useState<{ id: string; name: string; online_at?: string }[]>([]);
   const [results, setResults] = useState<Record<string, PlayerResult>>({});
   const [votes, setVotes] = useState<Record<string, string[]>>({});
@@ -161,9 +166,23 @@ const Game = () => {
     [running, showResults, votingActive, roundsPlayed, currentRoundIndex]
   );
   const matchInProgressRef = useRef(false);
-  useEffect(() => {
-    matchInProgressRef.current = matchInProgress;
-  }, [matchInProgress]);
+useEffect(() => {
+  matchInProgressRef.current = matchInProgress;
+}, [matchInProgress]);
+
+// Advertise room in public lobby when enabled (host-only)
+usePublicRoomAdvertiser({
+  enabled: !!roomCode && isHost && publicListing,
+  roomCode: roomCode || "",
+  payload: {
+    name: roomName,
+    hostName: profileName,
+    maxPlayers: 8,
+    createdAtISO: createdAtRef.current,
+  },
+  players: presentCount,
+  inMatch: matchInProgress,
+});
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => {
@@ -762,6 +781,35 @@ const Game = () => {
                             </SelectContent>
                           </Select>
                         </div>
+
+                        {!!roomCode && (
+                          <>
+                            <div className="grid gap-2">
+                              <Label htmlFor="room-name">Room name</Label>
+                              <Input
+                                id="room-name"
+                                value={roomName}
+                                onChange={(e) => setRoomName(e.target.value.slice(0, 40))}
+                                placeholder="e.g. Alex’s Room"
+                                disabled={!isHost || matchInProgress}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="grid gap-1">
+                                <Label htmlFor="public-toggle">Public listing</Label>
+                                <p className="text-sm text-muted-foreground">Show this room in the Lobby list.</p>
+                              </div>
+                              <Switch
+                                id="public-toggle"
+                                checked={publicListing}
+                                onCheckedChange={(v) => setPublicListing(!!v)}
+                                disabled={!isHost}
+                                aria-label="Toggle public listing"
+                              />
+                            </div>
+                          </>
+                        )}
+
                         {!!roomCode && !isHost && (
                           <div className="text-sm text-muted-foreground">Only the host can change settings.</div>
                         )}

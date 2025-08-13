@@ -1,11 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { gradientFromString, initialsFromName } from "@/lib/gradient";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from "@/components/ui/carousel";
+import { PlayerResultCard } from "@/components/PlayerResultCard";
 
 export type PlayerResult = {
   playerId: string;
@@ -141,69 +137,17 @@ export function ResultsOverlay({
                   <CarouselContent>
                     {entries.map((r) => (
                       <CarouselItem key={r.playerId} className="md:basis-3/4 lg:basis-2/3">
-                        <Card className="animate-enter">
-                          <CardHeader className="flex flex-row items-center gap-3">
-                            <Avatar>
-                              <AvatarFallback style={{ backgroundImage: gradientFromString(r.name), color: "white" }}>
-                                {initialsFromName(r.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                              <CardTitle className="text-base">{r.name}</CardTitle>
-                              <div className="text-xs text-muted-foreground">Letter: {r.letter ?? "–"} • Score: {scoreFor(r)}</div>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="space-y-3">
-                            {categories.map((c, i) => {
-                              const val = r.answers[i];
-                              const key = `${r.playerId}:${i}`;
-                              const disq = isDisqualified(key);
-                              const voterIds = votes[key] || [];
-                              const ltr = (r.letter || '').toUpperCase();
-                              const startsOk = !!val && ltr && val.trimStart().charAt(0).toUpperCase() === ltr;
-                              const dup = startsOk && (countsByIdx[i]?.[normalizeAnswer(val || '')] || 0) > 1;
-                              const allit = startsOk && !dup && !disq && isAlliteration(val || '', r.letter);
-                              return (
-                                <div key={i} className="flex items-center justify-between gap-3">
-                                  <div>
-                                    <div className="text-sm font-medium">{i + 1}. {c}</div>
-                                    <div className={`text-sm ${disq ? "line-through text-muted-foreground" : ""}`}>{val || <span className="text-muted-foreground">—</span>}</div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    {voterIds.length > 0 && (
-                                      <div className="flex -space-x-2">
-                                        {voterIds.map((vid) => {
-                                          const nm = playerNameById.get(vid) || "Player";
-                                          return (
-                                            <Avatar key={vid} className="h-6 w-6 border">
-                                              <AvatarFallback style={{ backgroundImage: gradientFromString(nm), color: "white" }}>
-                                                {initialsFromName(nm)}
-                                              </AvatarFallback>
-                                            </Avatar>
-                                          );
-                                        })}
-                                      </div>
-                                    )}
-                                    {disq && <Badge variant="secondary">Removed (-1)</Badge>}
-                                    {!disq && startsOk && dup && <Badge variant="secondary">Duplicate (0)</Badge>}
-                                    {!disq && startsOk && !dup && allit && <Badge variant="secondary">Alliteration +1</Badge>}
-                                    {!!val && !disq && (
-                                      <Button
-                                        size="sm"
-                                        variant="secondary"
-                                        onClick={() => onVote(key)}
-                                        disabled={r.playerId === localPlayerId}
-                                        aria-label={`Vote out ${r.name}'s answer for ${c}`}
-                                      >
-                                        Vote out
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </CardContent>
-                        </Card>
+                        <PlayerResultCard
+                          r={r}
+                          categories={categories}
+                          countsByIdx={countsByIdx}
+                          votes={votes}
+                          isDisqualified={isDisqualified}
+                          localPlayerId={localPlayerId}
+                          onVote={onVote}
+                          scoreFor={scoreFor}
+                          playerNameById={playerNameById}
+                        />
                       </CarouselItem>
                     ))}
                   </CarouselContent>

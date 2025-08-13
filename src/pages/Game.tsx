@@ -125,6 +125,7 @@ const [presentCount, setPresentCount] = useState<number>(1);
   const { playRoundStart, playVote, playWin } = useGameSounds(soundOn);
   const [roundStarting, setRoundStarting] = useState<boolean>(false);
   const roundStartingRef = useRef<boolean>(false);
+  const submittedRef = useRef<boolean>(false);
   // Ready-up presence state
   const [ready, setReady] = useState<boolean>(false);
   const [readyMap, setReadyMap] = useState<Record<string, boolean>>({});
@@ -192,6 +193,7 @@ usePublicRoomAdvertiser({
           setRunning(false);
           const r: PlayerResult = { playerId, name: profileName, letter, answers } as PlayerResult;
           setResults((prev) => ({ ...prev, [playerId]: r }));
+          submittedRef.current = true;
           if (roomCode && channelRef.current) {
             channelRef.current.send({ type: "broadcast", event: "round_submit", payload: r });
             if (isHost) {
@@ -246,6 +248,7 @@ usePublicRoomAdvertiser({
         setVotes({});
         setShowResults(false);
         setRoundCommitted(false);
+        submittedRef.current = false;
         setCurrentRoundIndex(p.roundIndex);
         // Reset ready on round start
         setReady(false);
@@ -261,15 +264,28 @@ usePublicRoomAdvertiser({
         setResults((prev) => ({ ...prev, [r.playerId]: r }));
       })
       .on('broadcast', { event: 'round_end' }, () => {
-        // Auto-submit local answers if not already submitted
-        if (!results[playerId]) {
+        if (!isHost) {
+          toast({ title: "Host ended the round early", description: "Your answers were auto-submitted. Cast your votes." });
+        }
+        if (!submittedRef.current) {
           const r: PlayerResult = { playerId, name: profileName, letter, answers } as PlayerResult;
           setResults((prev) => ({ ...prev, [playerId]: r }));
           channelRef.current?.send({ type: 'broadcast', event: 'round_submit', payload: r });
+          submittedRef.current = true;
         }
         setRunning(false);
         setShowResults(true);
         setVotingActive(true);
+        // Ensure all present players appear in results (empty answers if none submitted)
+        setResults((prev) => {
+          const next = { ...prev } as Record<string, PlayerResult>;
+          try {
+            for (const p of players) {
+              if (!next[p.id]) next[p.id] = { playerId: p.id, name: p.name, letter, answers: {} } as PlayerResult;
+            }
+          } catch {}
+          return next;
+        });
       })
       .on('broadcast', { event: 'vote' }, ({ payload }) => {
         const { key, voterId } = payload as { key: string; voterId: string };
@@ -586,6 +602,7 @@ usePublicRoomAdvertiser({
     setRunning(false);
     const r: PlayerResult = { playerId, name: profileName, letter, answers } as PlayerResult;
     setResults((prev) => ({ ...prev, [playerId]: r }));
+    submittedRef.current = true;
     if (roomCode && channelRef.current) {
       channelRef.current.send({ type: 'broadcast', event: 'round_submit', payload: r });
       if (isHost) {
@@ -603,6 +620,7 @@ usePublicRoomAdvertiser({
     setRunning(false);
     const r: PlayerResult = { playerId, name: profileName, letter, answers } as PlayerResult;
     setResults((prev) => ({ ...prev, [playerId]: r }));
+    submittedRef.current = true;
     channelRef.current.send({ type: 'broadcast', event: 'round_submit', payload: r });
     channelRef.current.send({ type: 'broadcast', event: 'round_end', payload: {} });
     setShowResults(true);

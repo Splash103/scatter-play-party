@@ -13,6 +13,18 @@ export type PlayerResult = {
   answers: Record<number, string>;
 };
 
+// Normalize answers for duplicate detection
+const normalizeAnswer = (s: string) => (s || "").toLowerCase().trim().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ");
+// Alliteration bonus: at least two words starting with the round letter
+const isAlliteration = (s: string, letter: string | null) => {
+  const l = (letter || "").toUpperCase();
+  if (!l) return false;
+  const words = (s || "").trim().split(/\s+/);
+  let count = 0;
+  for (const w of words) if (w.charAt(0).toUpperCase() === l) count++;
+  return count >= 2;
+};
+
 export function ResultsOverlay({
   open,
   onClose,
@@ -38,16 +50,43 @@ export function ResultsOverlay({
 }) {
   const majority = Math.floor(presentCount / 2) + 1;
 
+  const countsByIdx = useMemo(() => {
+    const map: Record<number, Record<string, number>> = {};
+    for (const r of Object.values(results)) {
+      const ltr = (r.letter || '').toUpperCase();
+      for (const [idxStr, val] of Object.entries(r.answers || {})) {
+        const idx = Number(idxStr);
+        if (!val) continue;
+        const startsOk = ltr && val.trimStart().charAt(0).toUpperCase() === ltr;
+        if (!startsOk) continue;
+        const norm = normalizeAnswer(val);
+        map[idx] = map[idx] || {};
+        map[idx][norm] = (map[idx][norm] || 0) + 1;
+      }
+    }
+    return map;
+  }, [results]);
+
   const isDisqualified = (key: string) => (votes[key]?.length || 0) >= majority;
+
 
   const scoreFor = (r: PlayerResult) => {
     let s = 0;
+    const ltr = (r.letter || '').toUpperCase();
     for (const idx in r.answers) {
       const i = Number(idx);
       const val = r.answers[i];
       if (!val || !val.trim()) continue;
       const key = `${r.playerId}:${i}`;
-      if (isDisqualified(key)) s -= 1; else s += 1;
+      const dq = isDisqualified(key);
+      const startsOk = ltr && val.trimStart().charAt(0).toUpperCase() === ltr;
+      if (dq) { s -= 1; continue; }
+      if (!startsOk) continue;
+      const dup = (countsByIdx[i]?.[normalizeAnswer(val)] || 0) > 1;
+      if (!dup) {
+        s += 1;
+        if (isAlliteration(val, r.letter)) s += 1;
+      }
     }
     return s;
   };
@@ -118,6 +157,10 @@ export function ResultsOverlay({
                         const key = `${r.playerId}:${i}`;
                         const disq = isDisqualified(key);
                         const voterIds = votes[key] || [];
+                        const ltr = (r.letter || '').toUpperCase();
+                        const startsOk = !!val && ltr && val.trimStart().charAt(0).toUpperCase() === ltr;
+                        const dup = startsOk && (countsByIdx[i]?.[normalizeAnswer(val || '')] || 0) > 1;
+                        const allit = startsOk && !dup && !disq && isAlliteration(val || '', r.letter);
                         return (
                           <div key={i} className="flex items-center justify-between gap-3">
                             <div>
@@ -140,6 +183,8 @@ export function ResultsOverlay({
                                 </div>
                               )}
                               {disq && <Badge variant="secondary">Removed (-1)</Badge>}
+                              {!disq && startsOk && dup && <Badge variant="secondary">Duplicate (0)</Badge>}
+                              {!disq && startsOk && !dup && allit && <Badge variant="secondary">Alliteration +1</Badge>}
                               {!!val && !disq && (
                                 <Button
                                   size="sm"

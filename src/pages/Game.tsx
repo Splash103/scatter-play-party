@@ -15,7 +15,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { gradientFromString, initialsFromName } from "@/lib/gradient";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Settings, Crown, Flame, Volume2, VolumeX } from "lucide-react";
+import { Settings, Crown, Flame, Volume2, VolumeX, CheckCircle, Share2 } from "lucide-react";
 import Particles from "@/components/Particles";
 import Aurora from "@/components/Aurora";
 import { CATEGORY_LISTS, generateRandomList } from "@/data/categoryLists";
@@ -42,6 +42,27 @@ const ALLOWED_LETTERS = [
 
 function randomLetter() {
   return ALLOWED_LETTERS[Math.floor(Math.random() * ALLOWED_LETTERS.length)];
+}
+
+// Normalize answers for duplicate detection
+function normalizeAnswer(s: string) {
+  return (s || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+// Alliteration bonus: at least two words starting with the round letter
+function isAlliteration(s: string, letter: string) {
+  const l = (letter || "").toUpperCase();
+  if (!l) return false;
+  const words = (s || "").trim().split(/\s+/);
+  let count = 0;
+  for (const w of words) {
+    if (w.charAt(0).toUpperCase() === l) count++;
+  }
+  return count >= 2;
 }
 
 const Game = () => {
@@ -99,6 +120,9 @@ const Game = () => {
   const { playRoundStart, playVote, playWin } = useGameSounds(soundOn);
   const [roundStarting, setRoundStarting] = useState<boolean>(false);
   const roundStartingRef = useRef<boolean>(false);
+  // Ready-up presence state
+  const [ready, setReady] = useState<boolean>(false);
+  const [readyMap, setReadyMap] = useState<Record<string, boolean>>({});
   const leaveRoom = () => {
     navigate("/");
     toast({ title: "Left room", description: "You returned to the main menu." });
@@ -123,6 +147,13 @@ const Game = () => {
     if (roundsPlayed === 0 && !currentRoundIndex) return roomCode ? "Start Match" : "Start Round";
     return "Next Round";
   }, [running, roundsPlayed, roundsPerMatch, currentRoundIndex, roomCode]);
+
+  const allReady = useMemo(() => {
+    if (!roomCode) return true;
+    if (players.length === 0) return false;
+    return players.every((p) => readyMap[p.id]);
+  }, [roomCode, players, readyMap]);
+  const readyCount = useMemo(() => players.filter((p) => readyMap[p.id]).length, [players, readyMap]);
 
   // Lock settings when a match is in progress (any round started until match ends)
   const matchInProgress = useMemo(
@@ -168,13 +199,15 @@ const Game = () => {
 
     channel
       .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState() as Record<string, { id: string; name: string; online_at?: string }[]>;
+        const state = channel.presenceState() as Record<string, { id: string; name: string; online_at?: string; ready?: boolean }[]>;
         const list = Object.entries(state).map(([key, presences]) => ({
           id: key,
           name: presences?.[0]?.name || 'Player',
           online_at: presences?.[0]?.online_at,
+          ready: !!presences?.[0]?.ready,
         }));
-        setPlayers(list);
+        setPlayers(list.map(({ id, name, online_at }) => ({ id, name, online_at })));
+        setReadyMap(Object.fromEntries(list.map(p => [p.id, !!p.ready])));
         setPresentCount(list.length || 1);
         const withTs = list.map((p) => ({ ...p, ts: Date.parse(p.online_at || '') || Date.now() }));
         withTs.sort((a, b) => a.ts - b.ts);
@@ -195,6 +228,9 @@ const Game = () => {
         setShowResults(false);
         setRoundCommitted(false);
         setCurrentRoundIndex(p.roundIndex);
+        // Reset ready on round start
+        setReady(false);
+        try { channelRef.current?.track({ id: playerId, name: profileName, online_at: new Date().toISOString(), ready: false }); } catch {}
         /* round index received: p.roundIndex; keep roundsPlayed as completed rounds */
         toast({ title: "Round started", description: `Letter: ${p.letter} • ${p.timer} seconds` });
         playRoundStart();
@@ -296,7 +332,7 @@ const Game = () => {
 
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
-        await channel.track({ id: playerId, name: profileName, online_at: new Date().toISOString() });
+        await channel.track({ id: playerId, name: profileName, online_at: new Date().toISOString(), ready });
       }
     });
 
@@ -313,6 +349,12 @@ const Game = () => {
     channelRef.current.send({ type: 'broadcast', event: 'scores_state', payload: { matchTotals, streaks, roundsPlayed, leaderId } });
   }, [roomCode, isHost]);
 
+  // Update presence when ready toggles
+  useEffect(() => {
+    if (!roomCode || !channelRef.current) return;
+    try { channelRef.current.track({ id: playerId, name: profileName, online_at: new Date().toISOString(), ready }); } catch {}
+  }, [ready, roomCode, playerId, profileName]);
+
   // Compute majority threshold for disqualification
   const majority = useMemo(() => Math.floor(presentCount / 2) + 1, [presentCount]);
 
@@ -320,20 +362,44 @@ const Game = () => {
   const commitRoundScores = (autoAdvance = false) => {
     if (!roomCode || !isHost) return;
     if (roundCommitted) return;
+
+    // Build duplicate maps per category index (only for valid starting-letter answers)
+    const targetLetterUpper = (letter || '').toUpperCase();
+    const countsByIdx: Record<number, Record<string, number>> = {};
+    for (const r of Object.values(results)) {
+      const ltr = (r.letter || targetLetterUpper).toUpperCase();
+      for (const [idxStr, ans] of Object.entries(r.answers || {})) {
+        const idx = Number(idxStr);
+        if (!ans) continue;
+        const startsOk = ltr && ans.trimStart().charAt(0).toUpperCase() === ltr;
+        if (!startsOk) continue;
+        const norm = normalizeAnswer(ans);
+        countsByIdx[idx] = countsByIdx[idx] || {};
+        countsByIdx[idx][norm] = (countsByIdx[idx][norm] || 0) + 1;
+      }
+    }
+
     // Tally round scores
     const newTotals = { ...matchTotals };
     const nextStreaks: Record<string, number> = { ...streaks };
     const perPlayerRoundScore: Record<string, number> = {};
     for (const r of Object.values(results)) {
       let score = 0;
-      const targetLetter = (r.letter || letter || '').toUpperCase();
+      const ltr = (r.letter || letter || '').toUpperCase();
       for (const [idxStr, ans] of Object.entries(r.answers || {})) {
         const idx = Number(idxStr);
         const key = `${r.playerId}:${idx}`;
         const dq = (votes[key]?.length || 0) >= majority;
-        const startsOk = !!ans && targetLetter && ans.trimStart().charAt(0).toUpperCase() === targetLetter;
-        if (startsOk && !dq) score += 1;
-        if (dq && !!ans?.trim()) score -= 1; // majority removal penalty
+        const val = ans || '';
+        const startsOk = !!val && ltr && val.trimStart().charAt(0).toUpperCase() === ltr;
+        if (dq && !!val.trim()) { score -= 1; continue; }
+        if (!startsOk) continue;
+        const norm = normalizeAnswer(val);
+        const dup = (countsByIdx[idx]?.[norm] || 0) > 1;
+        if (!dup) {
+          score += 1;
+          if (isAlliteration(val, ltr)) score += 1;
+        }
       }
       perPlayerRoundScore[r.playerId] = score;
       newTotals[r.playerId] = (newTotals[r.playerId] ?? 0) + score;
@@ -579,11 +645,30 @@ const Game = () => {
                   </div>
                   <span className="rounded-full border px-2 py-0.5 text-xs sm:text-sm sm:px-3 sm:py-1">Room {roomCode} • {presentCount} online</span>
 
-                  <Button variant="ghost" size="icon" aria-label={soundOn ? "Mute sound" : "Unmute sound"} onClick={() => setSoundOn((s) => !s)} className="hover-scale">
-                    {soundOn ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
-                  </Button>
+                  <Button variant="outline" size="sm" className="hover-scale" onClick={() => {
+                      const shareUrl = `${window.location.origin}/game?room=${roomCode}`;
+                      navigator.clipboard?.writeText(shareUrl);
+                      toast({ title: "Room link copied", description: shareUrl });
+                    }}>
+                      <Share2 className="h-4 w-4 mr-2" /> Share
+                    </Button>
 
-                  <Dialog>
+                    <span className="hidden sm:inline rounded-full border px-2 py-0.5 text-xs sm:text-sm">Ready {readyCount}/{presentCount}</span>
+
+                    <Button
+                      variant={ready ? "secondary" : "outline"}
+                      size="sm"
+                      className="hover-scale"
+                      onClick={() => {
+                        const next = !ready;
+                        setReady(next);
+                        try { channelRef.current?.track({ id: playerId, name: profileName, online_at: new Date().toISOString(), ready: next }); } catch {}
+                      }}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" /> {ready ? "Ready" : "Ready up"}
+                    </Button>
+
+                    <Dialog>
                     <DialogTrigger asChild>
                       <Button
                         variant="ghost"
@@ -753,7 +838,7 @@ const Game = () => {
                       )}
                     </div>
                     <div className="mt-4 sm:mt-6 flex items-center gap-2 sm:gap-3">
-                      <Button onClick={startRound} disabled={running || votingActive || roundStarting || (!!roomCode && !isHost)} className="hover-scale w-full sm:w-auto">
+                      <Button onClick={startRound} disabled={running || votingActive || roundStarting || (!!roomCode && (!isHost || !allReady))} className="hover-scale w-full sm:w-auto" title={roomCode && isHost && !allReady ? "Waiting for players to ready up" : undefined}>
                         {primaryButtonLabel}
                       </Button>
                       {roomCode && isHost && running && (
@@ -816,8 +901,9 @@ const Game = () => {
                                     </AvatarFallback>
                                   </Avatar>
                                   <div className="text-sm">
-                                    <div className="font-medium flex items-center gap-1">
+                                    <div className="font-medium flex items-center gap-2">
                                       {p.id === hostId ? <Crown className="h-3.5 w-3.5 text-primary" aria-label="Host" /> : null}
+                                      {readyMap[p.id] ? <CheckCircle className="h-3.5 w-3.5 text-primary" aria-label="Ready" /> : null}
                                       {p.name} {p.id === playerId ? <span className="text-muted-foreground">(You)</span> : null}
                                     </div>
                                   </div>

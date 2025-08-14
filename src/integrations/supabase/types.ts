@@ -69,12 +69,11 @@ export type Database = {
     Views: {
       v_leaderboard: {
         Row: {
-          avatar_url: string | null
           best_streak: number | null
+          created_at: string | null
           current_streak: number | null
-          name: string | null
-          user_id: string | null
-          wins: number | null
+          display_name: string | null
+          total_wins: number | null
         }
         Relationships: []
       }

@@ -20,11 +20,18 @@ export default function Leaderboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("v_leaderboard")
-        .select("user_id,name,avatar_url,wins,best_streak,current_streak")
-        .order("wins", { ascending: false })
+        .select("display_name, total_wins, current_streak, best_streak")
+        .order("total_wins", { ascending: false })
         .limit(50);
       if (error) throw error;
-      return (data || []) as Row[];
+      return (data || []).map((row, index) => ({
+        user_id: `user_${index}`,
+        name: row.display_name || 'Player',
+        avatar_url: null,
+        wins: row.total_wins || 0,
+        current_streak: row.current_streak || 0,
+        best_streak: row.best_streak || 0,
+      })) as Row[];
     },
   });
 

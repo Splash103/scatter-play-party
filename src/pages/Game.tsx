@@ -907,6 +907,11 @@ usePublicRoomAdvertiser({
                       <Button onClick={startRound} disabled={running || votingActive || roundStarting || (!!roomCode && (!isHost || !allReady))} className="hover-scale w-full sm:w-auto" title={roomCode && isHost && !allReady ? "Waiting for players to ready up" : undefined}>
                         {primaryButtonLabel}
                       </Button>
+                      {running && (
+                        <Button variant="outline" onClick={submitRound} className="hover-scale w-full sm:w-auto">
+                          Submit Round
+                        </Button>
+                      )}
                       {roomCode && isHost && running && (
                         <Button variant="outline" onClick={endRoundEarly} className="hover-scale w-full sm:w-auto">
                           End Round (Host)

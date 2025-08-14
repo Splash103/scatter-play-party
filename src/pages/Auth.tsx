@@ -1,96 +1,208 @@
-import { useEffect, useState } from "react";
-import { Helmet } from "react-helmet-async";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { Loader2 } from 'lucide-react';
 
-export default function Auth() {
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+const Auth = () => {
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const navigate = useNavigate();
 
-  // Keep session in sync and redirect when authenticated
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setTimeout(() => navigate("/"), 0);
-      }
-    });
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session?.user) navigate("/");
-    });
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  const handleSignIn = async () => {
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) {
-      toast({ title: "Sign in failed", description: error.message });
-    } else {
-      toast({ title: "Welcome back", description: "Signed in successfully." });
+
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`
+        }
+      });
+
+      if (error) {
+        if (error.message.includes('already registered')) {
+          toast({
+            title: 'Account exists',
+            description: 'An account with this email already exists. Please sign in instead.',
+            variant: 'destructive'
+          });
+        } else {
+          toast({
+            title: 'Sign up failed',
+            description: error.message,
+            variant: 'destructive'
+          });
+        }
+      } else {
+        toast({
+          title: 'Check your email',
+          description: 'We sent you a confirmation link to complete your registration.'
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'An error occurred',
+        description: 'Please try again later.',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSignUp = async () => {
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
-    const redirectUrl = `${window.location.origin}/`;
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: redirectUrl },
-    });
-    setLoading(false);
-    if (error) {
-      toast({ title: "Sign up failed", description: error.message });
-    } else {
-      toast({ title: "Check your email", description: "Confirm to complete sign up." });
-      // Ensure a profile gets created after confirmation on first login (handled elsewhere)
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          toast({
+            title: 'Sign in failed',
+            description: 'Invalid email or password. Please check your credentials.',
+            variant: 'destructive'
+          });
+        } else {
+          toast({
+            title: 'Sign in failed',
+            description: error.message,
+            variant: 'destructive'
+          });
+        }
+      } else {
+        toast({
+          title: 'Welcome back!',
+          description: 'You have been signed in successfully.'
+        });
+        navigate('/');
+      }
+    } catch (error) {
+      toast({
+        title: 'An error occurred',
+        description: 'Please try again later.',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <>
       <Helmet>
-        <title>{mode === "signin" ? "Login" : "Create Account"} — Scattergories Online</title>
-        <meta name="description" content="Sign in or create an account to save your wins and streaks on the leaderboard." />
+        <title>Sign In | Scattergories Online</title>
+        <meta name="description" content="Sign in or create an account to track your wins and join the global leaderboard in Scattergories Online." />
         <link rel="canonical" href="/auth" />
       </Helmet>
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-accent/10 to-background">
-        <Card className="w-full max-w-md bg-background/70 backdrop-blur-xl border">
-          <CardHeader>
-            <CardTitle>{mode === "signin" ? "Sign in" : "Create an account"}</CardTitle>
+      
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-accent/10 to-background p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold">Scattergories Online</CardTitle>
             <CardDescription>
-              {mode === "signin" ? "Welcome back!" : "Register to keep your wins and streaks."}
+              Sign in to track your wins and compete on the global leaderboard
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
-            </div>
-            <div className="flex items-center gap-2">
-              {mode === "signin" ? (
-                <Button onClick={handleSignIn} disabled={loading}>{loading ? "Signing in…" : "Sign in"}</Button>
-              ) : (
-                <Button onClick={handleSignUp} disabled={loading}>{loading ? "Creating…" : "Sign up"}</Button>
-              )}
-              <Button variant="secondary" onClick={() => setMode(mode === "signin" ? "signup" : "signin")}>{mode === "signin" ? "Need an account? Sign up" : "Have an account? Sign in"}</Button>
+          <CardContent>
+            <Tabs defaultValue="signin" className="space-y-4">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="signin">Sign In</TabsTrigger>
+                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="signin">
+                <form onSubmit={handleSignIn} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-email">Email</Label>
+                    <Input
+                      id="signin-email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Enter your email"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-password">Password</Label>
+                    <Input
+                      id="signin-password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Sign In
+                  </Button>
+                </form>
+              </TabsContent>
+              
+              <TabsContent value="signup">
+                <form onSubmit={handleSignUp} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-email">Email</Label>
+                    <Input
+                      id="signup-email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Enter your email"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password">Password</Label>
+                    <Input
+                      id="signup-password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Create a password"
+                      required
+                      disabled={loading}
+                      minLength={6}
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Sign Up
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
+            
+            <div className="mt-6 text-center">
+              <Button variant="ghost" onClick={() => navigate('/')}>
+                Continue as Guest
+              </Button>
             </div>
           </CardContent>
         </Card>
       </div>
     </>
   );
-}
+};
+
+export default Auth;

@@ -65,11 +65,11 @@ const Index = () => {
             </Button>
           </div>
           <header className="text-center mb-12">
-            <h1 className="text-5xl sm:text-6xl font-bold tracking-tight bg-gradient-to-r from-primary via-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
+            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight bg-gradient-to-r from-primary via-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
               Scattergories Online
             </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Experience the classic word game with stunning visuals and seamless multiplayer gameplay
+            <p className="text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
+              The classic game, but it looks better
             </p>
           </header>
 

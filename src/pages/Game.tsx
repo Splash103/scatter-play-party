@@ -261,7 +261,9 @@ const Game = () => {
 
   const startRound = useCallback(() => {
     const newLetter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
-    const newCategories = selectedList.categories;
+    const newCategories = selectedList.id === 'random' 
+      ? generateRandomList(12).categories 
+      : selectedList.categories;
     
     setPhase("playing");
     setLetter(newLetter);
@@ -278,11 +280,12 @@ const Game = () => {
         categories: newCategories,
         timeLeft: ROUND_TIME,
         round: currentRound,
+        totalRounds: totalRounds,
       });
     }
     
     playRoundStart();
-  }, [selectedList, currentRound, isMultiplayer, broadcastGameState, playRoundStart]);
+  }, [selectedList, currentRound, totalRounds, isMultiplayer, broadcastGameState, playRoundStart]);
 
   const handleTimeUp = useCallback(() => {
     if (!isMultiplayer) {

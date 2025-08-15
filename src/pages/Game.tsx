@@ -55,7 +55,6 @@ const Game = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const roomCode = searchParams.get("room")?.toUpperCase() || "";
-  const isHost = !roomCode || hostId === playerId;
   
   // Player state
   const [playerName, setPlayerName] = useState(() => localStorage.getItem("profileName") || "");
@@ -64,6 +63,7 @@ const Game = () => {
   // Room state
   const [players, setPlayers] = useState<Player[]>([]);
   const [hostId, setHostId] = useState<string | null>(null);
+  const isHost = !roomCode || hostId === playerId;
   const [isPublic, setIsPublic] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem("soundEnabled") !== "false");
   

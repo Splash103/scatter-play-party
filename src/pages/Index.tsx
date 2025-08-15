@@ -64,7 +64,7 @@ const Index = () => {
               <Link to="/auth">Account</Link>
             </Button>
           </div>
-          <header className="text-center mb-12">
+          <header className="text-center mb-12 mt-8">
             <h1 className="text-3xl sm:text-4xl font-bold tracking-normal w-fit mx-auto bg-gradient-to-r from-blue-600 via-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
               Scattergories Online
             </h1>

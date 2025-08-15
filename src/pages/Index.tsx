@@ -11,6 +11,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import Particles from "@/components/Particles";
 import Aurora from "@/components/Aurora";
 import { PlusCircle, Users, UserCircle2, Trophy, Gamepad2, Moon, Sun } from "lucide-react";
+import { ShoppingBag, Package } from "lucide-react";
 import { useTheme } from "next-themes";
 const ROOM_ALPHABET = "ABCDEFGHJKMNPQRSTWXYZ";
 function generateRoomCode(len = 4) {

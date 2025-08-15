@@ -490,6 +490,9 @@ export default function Game() {
     setRoundData(prev => prev ? { ...prev, submitted: true, submittedAt: Date.now() } : null);
     setEarlySubmitCount(prev => prev + 1);
     
+    // Show voting screen immediately when submitting early
+    setShowResults(true);
+    
     if (isMultiplayer) {
       broadcastGameState({ earlySubmitCount: earlySubmitCount + 1 });
     }
@@ -506,13 +509,19 @@ export default function Game() {
       timerRef.current = null;
     }
 
-    setGamePhase("results");
     setShowResults(true);
     
     if (isMultiplayer && isHost) {
       // Collect all results and broadcast
       const roundResults = {
-        results: { [playerId]: roundData },
+        results: Object.fromEntries(
+          players.map(p => [p.id, {
+            playerId: p.id,
+            name: p.name,
+            letter: roundData?.letter || null,
+            answers: roundData?.answers || {}
+          }])
+        ),
         votes: votes
       };
       
@@ -999,20 +1008,34 @@ export default function Game() {
     );
   };
 
-  const renderResults = () => (
-    <ResultsOverlay
-      open={showResults}
-      onClose={() => setShowResults(false)}
-      results={results}
-      presentCount={players.length}
-      votes={votes}
-      onVote={vote}
-      categories={roundData?.categories || []}
-      localPlayerId={playerId}
-      voteTimeLeft={Math.max(0, timeLeft)}
-      players={players}
-    />
-  );
+  const renderVotingScreen = () => {
+    if (!showResults || !roundData) return null;
+
+    // Create mock results for all players with their current answers
+    const mockResults = Object.fromEntries(
+      players.map(p => [p.id, {
+        playerId: p.id,
+        name: p.name,
+        letter: roundData.letter,
+        answers: p.id === playerId ? roundData.answers : {} // Only show current player's answers for now
+      }])
+    );
+
+    return (
+      <ResultsOverlay
+        open={showResults}
+        onClose={() => setShowResults(false)}
+        results={mockResults}
+        presentCount={players.length}
+        votes={votes}
+        onVote={vote}
+        categories={roundData.categories}
+        localPlayerId={playerId}
+        voteTimeLeft={Math.max(0, timeLeft)}
+        players={players}
+      />
+    );
+  };
 
   return (
     <>
@@ -1033,7 +1056,7 @@ export default function Game() {
         <div className="relative z-10 container py-8">
           {gamePhase === "lobby" && renderLobby()}
           {gamePhase === "playing" && renderGame()}
-          {gamePhase === "results" && renderResults()}
+          {renderVotingScreen()}
         </div>
 
         {/* Settings Dialog */}

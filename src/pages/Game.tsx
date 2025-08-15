@@ -43,7 +43,7 @@ import {
 
 // Game constants
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const ROUND_TIME = 90;
+const DEFAULT_ROUND_TIME = 90;
 const VOTE_TIME = 30;
 const RESULTS_TIME = 10;
 
@@ -73,6 +73,7 @@ const Game = () => {
   const [phase, setPhase] = useState<GamePhase>("lobby");
   const [currentRound, setCurrentRound] = useState(1);
   const [totalRounds, setTotalRounds] = useState(3);
+  const [roundTime, setRoundTime] = useState(DEFAULT_ROUND_TIME);
   const [timeLeft, setTimeLeft] = useState(0);
   const [letter, setLetter] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
@@ -172,7 +173,7 @@ const Game = () => {
     setVotes({});
     
     playRoundStart();
-    startTimer(ROUND_TIME);
+    startTimer(roundTime);
     
     // Broadcast to room
     channelRef.current?.send({
@@ -245,7 +246,7 @@ const Game = () => {
         setCurrentRound(payload.round);
         setPhase("playing");
         setAnswers({});
-        startTimer(ROUND_TIME);
+        startTimer(roundTime);
         playRoundStart();
       })
       .on("broadcast", { event: "answers_submitted" }, ({ payload }) => {
@@ -279,7 +280,30 @@ const Game = () => {
     if (timeLeft === 0 && phase === "playing") {
       submitAnswers();
     }
+    if (timeLeft === 0 && phase === "voting") {
+      setPhase("results");
+      setShowResults(true);
+    }
   }, [timeLeft, phase, submitAnswers]);
+
+  // Force end round (host only)
+  const forceEndRound = useCallback(() => {
+    if (!isPlayerHost) return;
+    
+    if (phase === "playing") {
+      submitAnswers();
+    } else if (phase === "voting") {
+      setPhase("results");
+      setShowResults(true);
+    }
+    
+    // Broadcast to room
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "force_end_round",
+      payload: { phase }
+    });
+  }, [isPlayerHost, phase, submitAnswers]);
 
   // Cleanup
   useEffect(() => {
@@ -420,9 +444,26 @@ const Game = () => {
                     )}
                   </div>
                   
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Round Time</label>
+                    <select
+                      value={roundTime}
+                      onChange={(e) => setRoundTime(Number(e.target.value))}
+                      className="w-full p-2 rounded-md border border-input bg-background glass-card"
+                      disabled={!isPlayerHost}
+                    >
+                      <option value={30}>30 seconds</option>
+                      <option value={60}>60 seconds</option>
+                      <option value={90}>90 seconds</option>
+                      <option value={120}>2 minutes</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="grid gap-4 sm:grid-cols-1">
                   {(phase === "playing" || phase === "voting") && (
                     <Progress 
-                      value={((phase === "playing" ? ROUND_TIME : VOTE_TIME) - timeLeft) / (phase === "playing" ? ROUND_TIME : VOTE_TIME) * 100} 
+                      value={((phase === "playing" ? roundTime : VOTE_TIME) - timeLeft) / (phase === "playing" ? roundTime : VOTE_TIME) * 100} 
                       className="mt-4"
                     />
                   )}
@@ -472,6 +513,7 @@ const Game = () => {
 
               {/* Playing Phase */}
               {phase === "playing" && (
+                <div className="space-y-6">
                 <Card className="glass-panel">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -483,6 +525,18 @@ const Game = () => {
                     <CardDescription>
                       Find words that start with "{letter}" for each category below
                     </CardDescription>
+                    {isPlayerHost && (
+                      <div className="flex justify-end">
+                        <Button 
+                          variant="destructive" 
+                          size="sm" 
+                          onClick={forceEndRound}
+                          className="glass-card hover:scale-105"
+                        >
+                          Force End Round
+                        </Button>
+                      </div>
+                    )}
                   </CardHeader>
                   <CardContent>
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -505,6 +559,39 @@ const Game = () => {
                       <Button onClick={submitAnswers} className="glass-card hover:scale-105">
                         Submit Answers
                       </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+                </div>
+              )}
+
+              {/* Voting Phase */}
+              {phase === "voting" && (
+                <Card className="glass-panel">
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span>Voting Phase</span>
+                      {isPlayerHost && (
+                        <Button 
+                          variant="destructive" 
+                          size="sm" 
+                          onClick={forceEndRound}
+                          className="glass-card hover:scale-105"
+                        >
+                          Force End Voting
+                        </Button>
+                      )}
+                    </CardTitle>
+                    <CardDescription>
+                      Vote on questionable answers. Results will show automatically.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center py-8">
+                      <div className="text-lg font-medium mb-2">Reviewing Answers...</div>
+                      <div className="text-sm text-muted-foreground">
+                        Vote on any answers you think should be disqualified
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

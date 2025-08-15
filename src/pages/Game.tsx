@@ -94,6 +94,7 @@ const Game = () => {
   // Refs
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const createdAtRef = useRef<string>(new Date().toISOString());
   
   // Hooks
   const { playRoundStart, playVote, playWin } = useGameSounds(soundEnabled);
@@ -106,7 +107,7 @@ const Game = () => {
       name: `${playerName || "Host"}'s Room`,
       hostName: playerName || "Host",
       maxPlayers: 8,
-      createdAtISO: new Date().toISOString(),
+      createdAtISO: createdAtRef.current,
     },
     players: players.filter(p => p.present).length,
     inMatch: phase !== "lobby",
@@ -436,37 +437,11 @@ const Game = () => {
                     <CardDescription>Configure your game settings</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <label className="text-sm font-medium mb-2 block">Category List</label>
-                        <select
-                          value={selectedList.id}
-                          onChange={(e) => {
-                            const list = CATEGORY_LISTS.find(l => l.id === e.target.value) || CATEGORY_LISTS[0];
-                            setSelectedList(list);
-                          }}
-                          className="w-full p-2 rounded-md border border-input bg-background"
-                          disabled={!isPlayerHost}
-                        >
-                          {CATEGORY_LISTS.map(list => (
-                            <option key={list.id} value={list.id}>{list.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      
-                      <div>
-                        <label className="text-sm font-medium mb-2 block">Rounds</label>
-                        <select
-                          value={totalRounds}
-                          onChange={(e) => setTotalRounds(Number(e.target.value))}
-                          className="w-full p-2 rounded-md border border-input bg-background"
-                          disabled={!isPlayerHost}
-                        >
-                          <option value={1}>1 Round</option>
-                          <option value={3}>3 Rounds</option>
-                          <option value={5}>5 Rounds</option>
-                        </select>
-                      </div>
+                    <div className="text-center text-muted-foreground">
+                      <p>Current settings: <strong>{selectedList.name}</strong> • <strong>{totalRounds} Round{totalRounds !== 1 ? 's' : ''}</strong></p>
+                      {isPlayerHost && (
+                        <p className="text-xs mt-1">Use the settings button to configure game options</p>
+                      )}
                     </div>
                     
                     {isPlayerHost && (
@@ -631,6 +606,61 @@ const Game = () => {
             setShowFinal(false);
           }}
         />
+
+        {/* Settings Dialog */}
+        <Dialog open={showSettings} onOpenChange={setShowSettings}>
+          <DialogContent className="glass-panel border-0">
+            <DialogHeader>
+              <DialogTitle className="text-2xl text-center mb-4">Game Settings</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Category List</label>
+                  <select
+                    value={selectedList.id}
+                    onChange={(e) => {
+                      const list = CATEGORY_LISTS.find(l => l.id === e.target.value) || CATEGORY_LISTS[0];
+                      setSelectedList(list);
+                    }}
+                    className="w-full p-2 rounded-md border border-input bg-background glass-card"
+                    disabled={!isPlayerHost}
+                  >
+                    {CATEGORY_LISTS.map(list => (
+                      <option key={list.id} value={list.id}>{list.name}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Rounds</label>
+                  <select
+                    value={totalRounds}
+                    onChange={(e) => setTotalRounds(Number(e.target.value))}
+                    className="w-full p-2 rounded-md border border-input bg-background glass-card"
+                    disabled={!isPlayerHost}
+                  >
+                    <option value={1}>1 Round</option>
+                    <option value={3}>3 Rounds</option>
+                    <option value={5}>5 Rounds</option>
+                  </select>
+                </div>
+              </div>
+              
+              {!isPlayerHost && (
+                <div className="text-center text-sm text-muted-foreground bg-muted/20 p-3 rounded-lg">
+                  Only the room host can change game settings
+                </div>
+              )}
+              
+              <div className="flex justify-end">
+                <Button onClick={() => setShowSettings(false)} className="glass-card hover:scale-105">
+                  Close
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </>
   );

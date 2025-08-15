@@ -142,25 +142,25 @@ All colors MUST be HSL.
   }
   
   .glass-card {
-    background: transparent;
+    background: transparent !important;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid hsl(var(--border) / 0.2);
+    border: 1px solid hsl(var(--border) / 0.1);
     box-shadow: var(--shadow-card);
     transition: var(--transition-card);
   }
   
   .glass-card:hover {
-    background: hsl(var(--background) / 0.05);
+    background: transparent !important;
     box-shadow: var(--shadow-card-hover);
     transform: translateY(-2px);
   }
   
   .glass-panel {
-    background: transparent;
+    background: transparent !important;
     backdrop-filter: blur(25px);
     -webkit-backdrop-filter: blur(25px);
-    border: 1px solid hsl(var(--border) / 0.2);
+    border: 1px solid hsl(var(--border) / 0.1);
     box-shadow: var(--shadow-elegant);
   }
   

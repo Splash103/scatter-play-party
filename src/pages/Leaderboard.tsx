@@ -96,7 +96,7 @@ export default function Leaderboard() {
               {list.map((e, idx) => (
                 <Card key={`${e.name}-${idx}`} className="glass-card floating-card animate-fade-in" style={{ animationDelay: `${idx * 0.1}s` }}>
                   <CardContent className="flex items-center gap-4 py-4">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 dark:from-white dark:to-gray-100 flex items-center justify-center text-white dark:text-black font-bold text-lg shadow-lg">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 dark:from-yellow-300 dark:to-orange-400 flex items-center justify-center text-white font-bold text-lg shadow-lg">
                       #{idx + 1}
                     </div>
                     <Avatar>

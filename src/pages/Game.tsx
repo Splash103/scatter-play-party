@@ -332,19 +332,6 @@ const Game = () => {
     }
   }, [hasSubmitted, isMultiplayer, playerId, currentPlayer?.name, letter, answers]);
 
-  const forceSubmitAll = useCallback(() => {
-    if (!isHost) return;
-    
-    if (channelRef.current) {
-      channelRef.current.send({
-        type: "broadcast",
-        event: "force_submit_all",
-      });
-    }
-    
-    handleTimeUp();
-  }, [isHost, handleTimeUp]);
-
   const handleTimeUp = useCallback(() => {
     setHasSubmitted(false); // Reset for next round
     
@@ -387,6 +374,19 @@ const Game = () => {
       });
     }
   }, [isMultiplayer, playerId, currentPlayer?.name, letter, answers, isHost, broadcastGameState]);
+
+  const forceSubmitAll = useCallback(() => {
+    if (!isHost) return;
+    
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: "broadcast",
+        event: "force_submit_all",
+      });
+    }
+    
+    handleTimeUp();
+  }, [isHost, handleTimeUp]);
 
   const handleVotingEnd = useCallback(() => {
     if (isHost) {

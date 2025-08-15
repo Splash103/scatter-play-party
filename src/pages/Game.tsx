@@ -1,1230 +1,1091 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { gradientFromString, initialsFromName } from "@/lib/gradient";
-import { useGameSounds } from "@/hooks/use-sound";
+import { Switch } from "@/components/ui/switch";
 import { usePublicRoomAdvertiser } from "@/hooks/usePublicRoomAdvertiser";
-import { ChatPanel, type ChatMessage } from "@/components/ChatPanel";
-import { ResultsOverlay } from "@/components/ResultsOverlay";
-import { FinalScoreboard, type FinalSummary } from "@/components/FinalScoreboard";
-import { CATEGORY_LISTS, generateRandomList, type CategoryList } from "@/data/categoryLists";
+import { ChatPanel, ChatMessage } from "@/components/ChatPanel";
+import { ResultsOverlay, PlayerResult } from "@/components/ResultsOverlay";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { gradientFromString, initialsFromName } from "@/lib/gradient";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Settings, Crown, Flame, Volume2, VolumeX, CheckCircle, Share2 } from "lucide-react";
 import Particles from "@/components/Particles";
 import Aurora from "@/components/Aurora";
-import {
-  Play,
-  Pause,
-  RotateCcw,
-  Settings,
-  Users,
-  Crown,
-  Clock,
-  Send,
-  Copy,
-  Check,
-  Volume2,
-  VolumeX,
-  Zap,
-  Target,
-  Trophy,
-  Star,
-  Flame,
-  Shield,
-  Eye,
-  EyeOff,
-  StopCircle,
-  FastForward,
-  AlertTriangle,
-  CheckCircle2,
-  Timer,
-  Sparkles
-} from "lucide-react";
-
-// Game state types
-type GamePhase = "lobby" | "playing" | "results" | "final";
-type GameMode = "solo" | "multiplayer";
-
-interface Player {
-  id: string;
-  name: string;
-  isHost?: boolean;
-  isReady?: boolean;
-  score?: number;
-  streak?: number;
-  powerUps?: PowerUp[];
-  achievements?: Achievement[];
-}
-
-interface PowerUp {
-  id: string;
-  type: "time_freeze" | "double_points" | "peek" | "shield" | "lightning";
-  name: string;
-  description: string;
-  uses: number;
-  maxUses: number;
-}
-
-interface Achievement {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  unlockedAt: string;
-}
-
-interface GameSettings {
-  roundTime: number;
-  maxRounds: number;
-  allowEarlySubmit: boolean;
-  showResultsAt: number; // seconds remaining when results show
-  enablePowerUps: boolean;
-  enableAchievements: boolean;
-  publicRoom: boolean;
-  maxPlayers: number;
-  categoryList: string;
-}
-
-interface RoundData {
-  letter: string;
-  categories: string[];
-  answers: Record<string, string>;
-  submitted: boolean;
-  submittedAt?: number;
-}
-
-const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const DEFAULT_SETTINGS: GameSettings = {
-  roundTime: 120,
-  maxRounds: 3,
-  allowEarlySubmit: true,
-  showResultsAt: 60,
-  enablePowerUps: true,
-  enableAchievements: true,
-  publicRoom: false,
-  maxPlayers: 8,
-  categoryList: "classic-1"
-};
-
-const POWER_UPS: PowerUp[] = [
-  {
-    id: "time_freeze",
-    type: "time_freeze",
-    name: "Time Freeze",
-    description: "Freeze the timer for 10 seconds",
-    uses: 0,
-    maxUses: 1
-  },
-  {
-    id: "double_points",
-    type: "double_points", 
-    name: "Double Points",
-    description: "Double points for this round",
-    uses: 0,
-    maxUses: 2
-  },
-  {
-    id: "peek",
-    type: "peek",
-    name: "Peek",
-    description: "See other players' progress",
-    uses: 0,
-    maxUses: 3
-  },
-  {
-    id: "shield",
-    type: "shield",
-    name: "Shield",
-    description: "Protect from vote-outs",
-    uses: 0,
-    maxUses: 1
-  },
-  {
-    id: "lightning",
-    type: "lightning",
-    name: "Lightning",
-    description: "Auto-fill one category",
-    uses: 0,
-    maxUses: 1
-  }
+import { CATEGORY_LISTS, generateRandomList } from "@/data/categoryLists";
+import { FinalScoreboard } from "@/components/FinalScoreboard";
+import { useGameSounds } from "@/hooks/use-sound";
+const DEFAULT_CATEGORIES = [
+  "Fruits",
+  "Countries",
+  "Things in a bedroom",
+  "TV Shows",
+  "Things that are cold",
+  "Animals",
+  "Occupations",
+  "Colors",
+  "Sports",
+  "Things you wear",
+  "In the kitchen",
+  "City names",
 ];
 
-export default function Game() {
+const ALLOWED_LETTERS = [
+  "A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","R","S","T","W"
+];
+
+function randomLetter() {
+  return ALLOWED_LETTERS[Math.floor(Math.random() * ALLOWED_LETTERS.length)];
+}
+
+// Normalize answers for duplicate detection
+function normalizeAnswer(s: string) {
+  return (s || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+// Alliteration bonus: at least two words starting with the round letter
+function isAlliteration(s: string, letter: string) {
+  const l = (letter || "").toUpperCase();
+  if (!l) return false;
+  const words = (s || "").trim().split(/\s+/);
+  let count = 0;
+  for (const w of words) {
+    if (w.charAt(0).toUpperCase() === l) count++;
+  }
+  return count >= 2;
+}
+
+const Game = () => {
+  const [timer, setTimer] = useState<number>(180);
+  const [timeLeft, setTimeLeft] = useState<number>(180);
+  const [running, setRunning] = useState(false);
+  const [letter, setLetter] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const roomCode = searchParams.get("room");
-  const isMultiplayer = !!roomCode;
-  const gameMode: GameMode = isMultiplayer ? "multiplayer" : "solo";
+  const [searchParams, setSearchParams] = useSearchParams();
+  const roomCode: string | null = ((searchParams.get("room") || "").toUpperCase()) || null;
 
-  // Core game state
-  const [gamePhase, setGamePhase] = useState<GamePhase>("lobby");
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
-  const [isHost, setIsHost] = useState(false);
-  const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
-  
-  // Round state
-  const [currentRound, setCurrentRound] = useState(0);
-  const [roundData, setRoundData] = useState<RoundData | null>(null);
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const [earlySubmitCount, setEarlySubmitCount] = useState(0);
-  const [canSubmitEarly, setCanSubmitEarly] = useState(false);
-  
-  // UI state
-  const [showSettings, setShowSettings] = useState(false);
-  const [showFinalResults, setShowFinalResults] = useState(false);
-  const [showStopDialog, setShowStopDialog] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [copied, setCopied] = useState(false);
-  const [peekMode, setPeekMode] = useState(false);
-  const [activePowerUps, setActivePowerUps] = useState<Set<string>>(new Set());
-  
-  // Multiplayer state
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [votes, setVotes] = useState<Record<string, string[]>>({});
-  const [results, setResults] = useState<Record<string, any>>({});
-  const [finalSummary, setFinalSummary] = useState<FinalSummary | null>(null);
-  
-  // Refs and hooks
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const { playRoundStart, playVote, playWin } = useGameSounds(soundEnabled);
-  const playerName = localStorage.getItem("profileName") || "Player";
-  const playerId = useMemo(() => `player_${Date.now()}_${Math.random().toString(36).slice(2)}`, []);
-
-  // Room advertising for public rooms
-  usePublicRoomAdvertiser({
-    enabled: isMultiplayer && isHost && settings.publicRoom,
-    roomCode: roomCode || "",
-    payload: {
-      name: `${playerName}'s Room`,
-      hostName: playerName,
-      maxPlayers: settings.maxPlayers,
-      createdAtISO: new Date().toISOString(),
-    },
-    players: players.length,
-    inMatch: gamePhase !== "lobby",
+  const initialName = (typeof window !== 'undefined' ? localStorage.getItem('profileName') : '') || 'Player';
+  const [profileName] = useState<string>(initialName);
+  const [playerId] = useState<string>(() => {
+    const existing = typeof window !== 'undefined' ? localStorage.getItem('playerId') : null;
+    if (existing) return existing;
+    const id = (crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2));
+    if (typeof window !== 'undefined') localStorage.setItem('playerId', id);
+    return id;
   });
+const createdAtRef = useRef<string>(new Date().toISOString());
+const [roomName, setRoomName] = useState<string>(() => `${(profileName || 'Player')}'s Room`);
+const [publicListing, setPublicListing] = useState<boolean>(false);
+const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+const [roomCreator, setRoomCreator] = useState<string | null>(null);
+const [messages, setMessages] = useState<ChatMessage[]>([]);
+const [presentCount, setPresentCount] = useState<number>(1);
+  const [players, setPlayers] = useState<{ id: string; name: string; online_at?: string }[]>([]);
+  const [results, setResults] = useState<Record<string, PlayerResult>>({});
+  const [votes, setVotes] = useState<Record<string, string[]>>({});
+  const [showResults, setShowResults] = useState(false);
 
-  // Initialize game
+  // Match state (multiplayer)
+  const [roundsPerMatch, setRoundsPerMatch] = useState<number>(5);
+  const [roundsPlayed, setRoundsPlayed] = useState<number>(0);
+  const [currentRoundIndex, setCurrentRoundIndex] = useState<number>(0);
+  const [activeCategories, setActiveCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [usedListIds, setUsedListIds] = useState<Set<string>>(new Set());
+  const [matchTotals, setMatchTotals] = useState<Record<string, number>>({});
+  const [streaks, setStreaks] = useState<Record<string, number>>({});
+  const [leaderId, setLeaderId] = useState<string | null>(null);
+  const [hostId, setHostId] = useState<string | null>(null);
+  const [roundCommitted, setRoundCommitted] = useState<boolean>(false);
+  const isHost = Boolean(roomCode) && hostId === playerId;
+  const [matchSummary, setMatchSummary] = useState<{
+    winners: { id: string; name: string; total: number }[];
+    totals: Record<string, number>;
+    players: { id: string; name: string }[];
+  } | null>(null);
+  const [finalOpen, setFinalOpen] = useState<boolean>(false);
+  const [voteSeconds, setVoteSeconds] = useState<number>(15);
+  const [voteTimeLeft, setVoteTimeLeft] = useState<number>(0);
+  const [votingActive, setVotingActive] = useState<boolean>(false);
+  const [soundOn, setSoundOn] = useState<boolean>(() => {
+    try { return JSON.parse(localStorage.getItem('soundOn') ?? 'true'); } catch { return true; }
+  });
+  useEffect(() => { localStorage.setItem('soundOn', JSON.stringify(soundOn)); }, [soundOn]);
+  const { playRoundStart, playVote, playWin } = useGameSounds(soundOn);
+  const [roundStarting, setRoundStarting] = useState<boolean>(false);
+  const roundStartingRef = useRef<boolean>(false);
+  const submittedRef = useRef<boolean>(false);
+  // Ready-up presence state
+  const [ready, setReady] = useState<boolean>(false);
+  const [readyMap, setReadyMap] = useState<Record<string, boolean>>({});
+  const leaveRoom = () => {
+    navigate("/");
+    toast({ title: "Left room", description: "You returned to the main menu." });
+  };
+  const progress = useMemo(() => {
+    if (!running || timer === 0) return 0;
+    return Math.min(100, ((timer - timeLeft) / timer) * 100);
+  }, [running, timeLeft, timer]);
+
+  const displayRound = useMemo(() => {
+    if (currentRoundIndex > 0) return currentRoundIndex;
+    const base = roundsPlayed;
+    const inProgress = running || showResults || votingActive;
+    const next = base + (inProgress ? 1 : 0);
+    if (next <= 0) return 1;
+    return Math.min(roundsPerMatch, next);
+  }, [currentRoundIndex, roundsPlayed, running, showResults, votingActive, roundsPerMatch]);
+
+  const primaryButtonLabel = useMemo(() => {
+    if (running) return "Round Running";
+    if (roundsPlayed >= roundsPerMatch) return "Start New Match";
+    if (roundsPlayed === 0 && !currentRoundIndex) return roomCode ? "Start Match" : "Start Round";
+    return "Next Round";
+  }, [running, roundsPlayed, roundsPerMatch, currentRoundIndex, roomCode]);
+
+  const allReady = useMemo(() => {
+    if (!roomCode) return true;
+    if (players.length === 0) return false;
+    return players.every((p) => readyMap[p.id]);
+  }, [roomCode, players, readyMap]);
+  const readyCount = useMemo(() => players.filter((p) => readyMap[p.id]).length, [players, readyMap]);
+
+  // Lock settings when a match is in progress (any round started until match ends)
+  const matchInProgress = useMemo(
+    () => running || showResults || votingActive || roundsPlayed > 0 || currentRoundIndex > 0,
+    [running, showResults, votingActive, roundsPlayed, currentRoundIndex]
+  );
+  const matchInProgressRef = useRef(false);
+useEffect(() => {
+  matchInProgressRef.current = matchInProgress;
+}, [matchInProgress]);
+
+// Advertise room in public lobby when enabled (host-only)
+usePublicRoomAdvertiser({
+  enabled: !!roomCode && isHost && publicListing,
+  roomCode: roomCode || "",
+  payload: {
+    name: roomName,
+    hostName: profileName,
+    maxPlayers: 8,
+    createdAtISO: createdAtRef.current,
+  },
+  players: presentCount,
+  inMatch: matchInProgress,
+});
   useEffect(() => {
-    if (isMultiplayer && roomCode) {
-      initializeMultiplayerRoom();
-    } else {
-      initializeSoloGame();
-    }
-    return () => cleanup();
-  }, [roomCode]);
+    if (!running) return;
+    const id = setInterval(() => {
+      setTimeLeft((t) => {
+        if (t <= 1) {
+          clearInterval(id);
+          setRunning(false);
+          const r: PlayerResult = { playerId, name: profileName, letter, answers } as PlayerResult;
+          setResults((prev) => ({ ...prev, [playerId]: r }));
+          submittedRef.current = true;
+          if (roomCode && channelRef.current) {
+            channelRef.current.send({ type: "broadcast", event: "round_submit", payload: r });
+            if (isHost) {
+              channelRef.current.send({ type: "broadcast", event: "round_end", payload: {} });
+            }
+          }
+          if (!roomCode || isHost) {
+            setShowResults(true);
+            setVotingActive(true);
+          }
+          toast({ title: "Time's up!", description: "Review and submit your answers." });
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [running, roomCode, playerId, profileName, letter, answers, isHost]);
 
-  const cleanup = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
-    }
-  };
-
-  const initializeSoloGame = () => {
-    const player: Player = {
-      id: playerId,
-      name: playerName,
-      isHost: true,
-      isReady: true,
-      score: 0,
-      streak: 0,
-      powerUps: [...POWER_UPS],
-      achievements: []
-    };
-    setPlayers([player]);
-    setCurrentPlayer(player);
-    setIsHost(true);
-    setGamePhase("lobby");
-  };
-
-  const initializeMultiplayerRoom = async () => {
+  useEffect(() => {
     if (!roomCode) return;
-
-    const channel = supabase.channel(`game_${roomCode}`, {
-      config: { presence: { key: playerId } }
-    });
+    
+    // Set this player as room creator if they're first to join
+    if (!roomCreator) {
+      setRoomCreator(playerId);
+      setHostId(playerId); // Make room creator the initial host
+    }
+    
+    const channel = supabase.channel(`room_${roomCode}`, { config: { presence: { key: playerId } } });
     channelRef.current = channel;
 
     channel
-      .on("presence", { event: "sync" }, () => {
-        const state = channel.presenceState();
-        const playerList = Object.entries(state).map(([id, presences]) => {
-          const presence = presences[0] as any;
-          return {
-            id,
-            name: presence.name || "Player",
-            isHost: presence.isHost || false,
-            isReady: presence.isReady || false,
-            score: presence.score || 0,
-            streak: presence.streak || 0,
-            powerUps: presence.powerUps || [...POWER_UPS],
-            achievements: presence.achievements || []
-          };
-        });
-        setPlayers(playerList);
-        
-        const hostPlayer = playerList.find(p => p.isHost);
-        const currentPlayerData = playerList.find(p => p.id === playerId);
-        if (currentPlayerData) {
-          setCurrentPlayer(currentPlayerData);
-          setIsHost(currentPlayerData.isHost || false);
-        } else if (!hostPlayer && playerList.length > 0) {
-          setIsHost(true);
-        }
-      })
-      .on("broadcast", { event: "game_state" }, ({ payload }) => {
-        handleGameStateUpdate(payload);
-      })
-      .on("broadcast", { event: "chat_message" }, ({ payload }) => {
-        setChatMessages(prev => [...prev, payload]);
-      })
-      .on("broadcast", { event: "vote" }, ({ payload }) => {
-        setVotes(prev => ({
-          ...prev,
-          [payload.key]: [...(prev[payload.key] || []), payload.voterId]
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState() as Record<string, { id: string; name: string; online_at?: string; ready?: boolean }[]>;
+        const list = Object.entries(state).map(([key, presences]) => ({
+          id: key,
+          name: presences?.[0]?.name || 'Player',
+          online_at: presences?.[0]?.online_at,
+          ready: !!presences?.[0]?.ready,
         }));
-        playVote();
-      })
-      .on("broadcast", { event: "round_results" }, ({ payload }) => {
-        setResults(payload.results);
-        setVotes(payload.votes || {});
-        setShowResults(true);
-      })
-      .on("broadcast", { event: "final_results" }, ({ payload }) => {
-        setFinalSummary(payload.summary);
-        setShowFinalResults(true);
-        playWin();
-      })
-      .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          await channel.track({
-            name: playerName,
-            isHost: !players.some(p => p.isHost),
-            isReady: false,
-            score: 0,
-            streak: 0,
-            powerUps: [...POWER_UPS],
-            achievements: []
-          });
+        setPlayers(list.map(({ id, name, online_at }) => ({ id, name, online_at })));
+        setReadyMap(Object.fromEntries(list.map(p => [p.id, !!p.ready])));
+        setPresentCount(list.length || 1);
+        
+        // Host assignment: prioritize room creator, then first person to join
+        if (list.length > 0) {
+          const currentHost = hostId;
+          const currentHostStillPresent = list.some(p => p.id === currentHost);
+          
+          if (!currentHost || !currentHostStillPresent) {
+            // If we know who created the room and they're present, make them host
+            if (roomCreator && list.some(p => p.id === roomCreator)) {
+              setHostId(roomCreator);
+            } else {
+              // Otherwise assign to the person with earliest timestamp
+              const withTs = list.map((p) => ({ ...p, ts: Date.parse(p.online_at || '') || Date.now() }));
+              withTs.sort((a, b) => a.ts - b.ts);
+              setHostId(withTs[0]?.id ?? null);
+            }
+          }
         }
+      })
+      .on('broadcast', { event: 'chat' }, ({ payload }) => {
+        setMessages((m) => [...m, payload as ChatMessage].slice(-200));
+      })
+      .on('broadcast', { event: 'round_start' }, ({ payload }) => {
+        const p = payload as { letter: string; timer: number; categories: string[]; roundIndex: number };
+        setLetter(p.letter);
+        setAnswers({});
+        setActiveCategories(p.categories);
+        setTimeLeft(p.timer);
+        setRunning(true);
+        setResults({});
+        setVotes({});
+        setShowResults(false);
+        setRoundCommitted(false);
+        submittedRef.current = false;
+        setCurrentRoundIndex(p.roundIndex);
+        // Reset ready on round start
+        setReady(false);
+        try { channelRef.current?.track({ id: playerId, name: profileName, online_at: new Date().toISOString(), ready: false }); } catch {}
+        /* round index received: p.roundIndex; keep roundsPlayed as completed rounds */
+        toast({ title: "Round started", description: `Letter: ${p.letter} • ${p.timer} seconds` });
+        playRoundStart();
+        setRoundStarting(false);
+        roundStartingRef.current = false;
+      })
+      .on('broadcast', { event: 'round_submit' }, ({ payload }) => {
+        const r = payload as PlayerResult;
+        setResults((prev) => ({ ...prev, [r.playerId]: r }));
+      })
+      .on('broadcast', { event: 'round_end' }, () => {
+        if (!isHost) {
+          toast({ title: "Host ended the round early", description: "Your answers were auto-submitted. Cast your votes." });
+        }
+        if (!submittedRef.current) {
+          const r: PlayerResult = { playerId, name: profileName, letter, answers } as PlayerResult;
+          setResults((prev) => ({ ...prev, [playerId]: r }));
+          channelRef.current?.send({ type: 'broadcast', event: 'round_submit', payload: r });
+          submittedRef.current = true;
+        }
+        setRunning(false);
+        setShowResults(true);
+        setVotingActive(true);
+        // Ensure all present players appear in results (empty answers if none submitted)
+        setResults((prev) => {
+          const next = { ...prev } as Record<string, PlayerResult>;
+          try {
+            for (const p of players) {
+              if (!next[p.id]) next[p.id] = { playerId: p.id, name: p.name, letter, answers: {} } as PlayerResult;
+            }
+          } catch {}
+          return next;
+        });
+      })
+      .on('broadcast', { event: 'vote' }, ({ payload }) => {
+        const { key, voterId } = payload as { key: string; voterId: string };
+        setVotes((prev) => {
+          const set = new Set([...(prev[key] || [])]);
+          set.add(voterId);
+          return { ...prev, [key]: Array.from(set) };
+        });
+      })
+      .on('broadcast', { event: 'vote_extend' }, ({ payload }) => {
+        const { add } = payload as { add: number };
+        setVoteTimeLeft((t) => t + (add || 0));
+      })
+      .on('broadcast', { event: 'room_settings' }, ({ payload }) => {
+        // Ignore mid-match setting changes
+        if (matchInProgressRef.current) return;
+        const p = payload as { timer: number; roundsPerMatch: number; voteSeconds?: number };
+        setTimer(p.timer);
+        setRoundsPerMatch(p.roundsPerMatch);
+        if (typeof p.voteSeconds === 'number') setVoteSeconds(p.voteSeconds);
+        toast({ title: "Room settings updated", description: `Timer ${p.timer}s • Rounds ${p.roundsPerMatch}${typeof p.voteSeconds === 'number' ? ` • Voting ${p.voteSeconds}s` : ''}` });
+      })
+      .on('broadcast', { event: 'scores_state' }, ({ payload }) => {
+        const p = payload as { matchTotals: Record<string, number>; streaks: Record<string, number>; roundsPlayed: number; leaderId: string | null };
+        setMatchTotals(p.matchTotals);
+        setStreaks(p.streaks);
+        setRoundsPlayed(p.roundsPlayed);
+        setLeaderId(p.leaderId ?? null);
+      })
+      .on('broadcast', { event: 'match_end' }, ({ payload }) => {
+        const p = payload as { 
+          winners: { id: string; name: string; total: number }[]; 
+          matchId?: string; 
+          totals?: Record<string, number>; 
+          players?: { id: string; name: string }[] 
+        };
+        // Update local leaderboard (legacy local storage)
+        try {
+          const raw = localStorage.getItem('leaderboard');
+          const existing = raw ? (JSON.parse(raw) as { name: string; wins: number }[]) : [];
+          const map = new Map(existing.map((e) => [e.name, e.wins] as const));
+          for (const w of p.winners) {
+            map.set(w.name, (map.get(w.name) ?? 0) + 1);
+          }
+          const updated = Array.from(map.entries()).map(([name, wins]) => ({ name, wins }));
+          localStorage.setItem('leaderboard', JSON.stringify(updated));
+        } catch (_) {}
+        toast({ title: "Match over!", description: `Winner(s): ${p.winners.map((w) => w.name).join(', ')}` });
+
+        // Persist to Supabase if signed in
+        (async () => {
+          const { data: sess } = await supabase.auth.getSession();
+          const user = sess.session?.user;
+          if (!user) return;
+          const meWon = p.winners.some((w) => w.id === playerId);
+          // Ensure profile exists and update streaks
+          const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+          const display_name = prof?.display_name || profileName || user.email || 'Player';
+          const current_streak = meWon ? (prof?.current_streak ?? 0) + 1 : 0;
+          const best_streak = Math.max(prof?.best_streak ?? 0, current_streak);
+          await supabase.from('profiles').upsert({ id: user.id, display_name, current_streak, best_streak }).select();
+          // Record a match win if this client won and we have a matchId
+          if (meWon && p.matchId) {
+            await supabase.from('match_wins').insert({ match_id: p.matchId, user_id: user.id }).select();
+          }
+        })();
+
+        // Show final scoreboard to all players using the data from the broadcast
+        if (!isHost) {
+          // Use the broadcast totals and players if available, otherwise fall back to local data
+          const broadcastTotals = p.totals || {};
+          const broadcastPlayers = p.players || players.map((pl) => ({ id: pl.id, name: pl.name }));
+          const totals: Record<string, number> = { ...broadcastTotals };
+          
+          // Ensure all players have a score entry
+          for (const pl of broadcastPlayers) { 
+            if (totals[pl.id] === undefined) totals[pl.id] = 0; 
+          }
+          
+          setMatchSummary({ winners: p.winners, totals, players: broadcastPlayers });
+          setFinalOpen(true);
+        }
+        // Reset match state
+        setMatchTotals({});
+        setStreaks({});
+        setRoundsPlayed(0);
+        setLeaderId(null);
+        setUsedListIds(new Set());
+        setCurrentRoundIndex(0);
       });
-  };
 
-  const handleGameStateUpdate = (payload: any) => {
-    if (payload.phase) setGamePhase(payload.phase);
-    if (payload.settings) setSettings(payload.settings);
-    if (payload.currentRound !== undefined) setCurrentRound(payload.currentRound);
-    if (payload.roundData) setRoundData(payload.roundData);
-    if (payload.timeLeft !== undefined) setTimeLeft(payload.timeLeft);
-    if (payload.isPaused !== undefined) setIsPaused(payload.isPaused);
-    if (payload.earlySubmitCount !== undefined) setEarlySubmitCount(payload.earlySubmitCount);
-    if (payload.showResults !== undefined) setShowResults(payload.showResults);
-  };
-
-  const broadcastGameState = (updates: any) => {
-    if (!channelRef.current) return;
-    channelRef.current.send({
-      type: "broadcast",
-      event: "game_state",
-      payload: updates
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await channel.track({ id: playerId, name: profileName, online_at: new Date().toISOString(), ready });
+      }
     });
-  };
 
-  const sendChatMessage = (text: string) => {
-    if (!channelRef.current) return;
-    const message: ChatMessage = {
-      id: playerId,
-      name: playerName,
-      text,
-      ts: Date.now()
+    return () => {
+      supabase.removeChannel(channel);
+      channelRef.current = null;
     };
-    channelRef.current.send({
-      type: "broadcast",
-      event: "chat_message",
-      payload: message
-    });
-    setChatMessages(prev => [...prev, message]);
+  }, [roomCode, playerId, profileName]);
+
+  // Host: broadcast current settings/scores when becoming host or on subscribe
+  useEffect(() => {
+    if (!roomCode || !channelRef.current || !isHost) return;
+    channelRef.current.send({ type: 'broadcast', event: 'room_settings', payload: { timer, roundsPerMatch, voteSeconds } });
+    channelRef.current.send({ type: 'broadcast', event: 'scores_state', payload: { matchTotals, streaks, roundsPlayed, leaderId } });
+  }, [roomCode, isHost]);
+
+  // Update presence when ready toggles
+  useEffect(() => {
+    if (!roomCode || !channelRef.current) return;
+    try { channelRef.current.track({ id: playerId, name: profileName, online_at: new Date().toISOString(), ready }); } catch {}
+  }, [ready, roomCode, playerId, profileName]);
+
+  // Compute majority threshold for disqualification
+  const majority = useMemo(() => Math.floor(presentCount / 2) + 1, [presentCount]);
+
+  // Host-only: commit round scores based on current results and votes
+  const commitRoundScores = (autoAdvance = false) => {
+    if (!roomCode || !isHost) return;
+    if (roundCommitted) return;
+
+    // Build duplicate maps per category index (only for valid starting-letter answers)
+    const targetLetterUpper = (letter || '').toUpperCase();
+    const countsByIdx: Record<number, Record<string, number>> = {};
+    for (const r of Object.values(results)) {
+      const ltr = (r.letter || targetLetterUpper).toUpperCase();
+      for (const [idxStr, ans] of Object.entries(r.answers || {})) {
+        const idx = Number(idxStr);
+        if (!ans) continue;
+        const startsOk = ltr && ans.trimStart().charAt(0).toUpperCase() === ltr;
+        if (!startsOk) continue;
+        const norm = normalizeAnswer(ans);
+        countsByIdx[idx] = countsByIdx[idx] || {};
+        countsByIdx[idx][norm] = (countsByIdx[idx][norm] || 0) + 1;
+      }
+    }
+
+    // Tally round scores
+    const newTotals = { ...matchTotals };
+    const nextStreaks: Record<string, number> = { ...streaks };
+    const perPlayerRoundScore: Record<string, number> = {};
+    for (const r of Object.values(results)) {
+      let score = 0;
+      const ltr = (r.letter || letter || '').toUpperCase();
+      for (const [idxStr, ans] of Object.entries(r.answers || {})) {
+        const idx = Number(idxStr);
+        const key = `${r.playerId}:${idx}`;
+        const dq = (votes[key]?.length || 0) >= majority;
+        const val = ans || '';
+        const startsOk = !!val && ltr && val.trimStart().charAt(0).toUpperCase() === ltr;
+        if (dq && !!val.trim()) { score -= 1; continue; }
+        if (!startsOk) continue;
+        const norm = normalizeAnswer(val);
+        const dup = (countsByIdx[idx]?.[norm] || 0) > 1;
+        if (!dup) {
+          score += 1;
+          if (isAlliteration(val, ltr)) score += 1;
+        }
+      }
+      perPlayerRoundScore[r.playerId] = score;
+      newTotals[r.playerId] = (newTotals[r.playerId] ?? 0) + score;
+    }
+    // Determine round winners (for UI only); do NOT update streaks here (streaks are per MATCH)
+    const maxScore = Math.max(0, ...Object.values(perPlayerRoundScore));
+    const winners = Object.entries(perPlayerRoundScore)
+      .filter(([, s]) => s === maxScore)
+      .map(([id]) => id);
+
+    // Keep streaks unchanged during rounds
+    // Compute leader by totals (tie => null)
+    let nextLeader: string | null = null;
+    let maxTotal = -1;
+    let tie = false;
+    for (const [id, tot] of Object.entries(newTotals)) {
+      if (tot > maxTotal) { maxTotal = tot; nextLeader = id; tie = false; }
+      else if (tot === maxTotal) { tie = true; }
+    }
+    if (tie) nextLeader = null;
+
+    // Compute next round index based on current state
+    const nextRound = roundsPlayed + 1;
+
+    setMatchTotals(newTotals);
+    setStreaks(nextStreaks);
+    setRoundsPlayed(nextRound);
+    setLeaderId(nextLeader);
+    setRoundCommitted(true);
+
+    // Broadcast state
+    channelRef.current?.send({ type: 'broadcast', event: 'scores_state', payload: {
+      matchTotals: newTotals,
+      streaks: nextStreaks,
+      roundsPlayed: nextRound,
+      leaderId: nextLeader,
+    }});
+
+    // Auto end match if done
+    const done = nextRound >= roundsPerMatch;
+    if (done) endMatch(newTotals);
   };
 
-  const toggleReady = async () => {
-    if (!channelRef.current || !currentPlayer) return;
-    const newReady = !currentPlayer.isReady;
-    await channelRef.current.track({
-      ...currentPlayer,
-      isReady: newReady
+  const endMatch = (totalsArg?: Record<string, number>) => {
+    if (!roomCode || !isHost) return;
+    const currentPlayers = players.map((p) => ({ id: p.id, name: p.name }));
+    const totalsRaw = totalsArg ?? matchTotals;
+    // Ensure all players are present in totals
+    const totals: Record<string, number> = { ...totalsRaw };
+    for (const p of currentPlayers) { if (totals[p.id] === undefined) totals[p.id] = 0; }
+
+    const maxTotal = Math.max(0, ...Object.values(totals));
+    const winners = Object.entries(totals).filter(([, t]) => t === maxTotal).map(([id]) => {
+      const name = players.find((p) => p.id === id)?.name || 'Player';
+      return { id, name, total: maxTotal };
     });
+
+    // Update streaks at MATCH end (not per round)
+    const newStreaks: Record<string, number> = { ...streaks };
+    const winnerIds = new Set(winners.map((w) => w.id));
+    for (const p of currentPlayers) {
+      if (winnerIds.has(p.id)) newStreaks[p.id] = (newStreaks[p.id] ?? 0) + 1; else newStreaks[p.id] = 0;
+    }
+
+    // Create a match id for persistence
+    const matchId = (crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)) as string;
+
+    // Open final scoreboard locally
+    setMatchSummary({ winners, totals, players: currentPlayers });
+    setFinalOpen(true);
+    playWin();
+
+    // Broadcast to room (include match id and totals for other players to display scoreboard)
+    channelRef.current?.send({ type: 'broadcast', event: 'match_end', payload: { winners, matchId, totals, players: currentPlayers } });
+    channelRef.current?.send({ type: 'broadcast', event: 'scores_state', payload: {
+      matchTotals: totals,
+      streaks: newStreaks,
+      roundsPlayed: 0,
+      leaderId: null,
+    }});
+
+    // Update local state for next match (keep totals for scoreboard until reset)
+    setStreaks(newStreaks);
+    setRoundsPlayed(0);
+    setLeaderId(null);
   };
 
-  const startMatch = () => {
-    if (!isHost) return;
-    
-    const readyPlayers = players.filter(p => p.isReady || p.isHost);
-    if (readyPlayers.length < 1) {
-      toast({
-        title: "Cannot start",
-        description: "At least one player must be ready."
-      });
+  const selectNextList = (): { id: string; categories: string[] } | null => {
+    const available = CATEGORY_LISTS.filter((l) => !usedListIds.has(l.id));
+    if (available.length === 0) {
+      const rand = generateRandomList();
+      return { id: rand.id, categories: rand.categories };
+    }
+    const pick = available[Math.floor(Math.random() * available.length)];
+    return { id: pick.id, categories: pick.categories };
+  };
+
+  const startRound = () => {
+    if (roomCode && !isHost) {
+      toast({ title: "Host only", description: "Only the host can start a round." });
       return;
     }
 
-    startNewRound();
-    playRoundStart();
-  };
+    if (roundStartingRef.current) return;
+    roundStartingRef.current = true;
+    setRoundStarting(true);
 
-  const startNewRound = () => {
-    const categoryList = CATEGORY_LISTS.find(l => l.id === settings.categoryList) || generateRandomList();
-    const letter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
-    
-    const newRoundData: RoundData = {
-      letter,
-      categories: categoryList.categories.slice(0, 12),
-      answers: {},
-      submitted: false
-    };
-
-    setRoundData(newRoundData);
-    setTimeLeft(settings.roundTime);
-    setGamePhase("playing");
-    setShowResults(false);
-    setEarlySubmitCount(0);
-    setCanSubmitEarly(settings.allowEarlySubmit);
-    setVotes({});
-    setResults({});
-
-    if (isMultiplayer) {
-      broadcastGameState({
-        phase: "playing",
-        roundData: newRoundData,
-        timeLeft: settings.roundTime,
-        currentRound: currentRound + 1,
-        showResults: false,
-        earlySubmitCount: 0
-      });
+    const willCommit = !!roomCode && showResults && !roundCommitted;
+    if (willCommit) {
+      commitRoundScores();
     }
 
-    startTimer();
+    let effectiveRoundsPlayed = roundsPlayed + (willCommit ? 1 : 0);
+
+      if (roomCode) {
+        if (effectiveRoundsPlayed >= roundsPerMatch) {
+          // Do not auto-start a new match; show final results instead
+          toast({ title: "Match finished", description: "View the final scoreboard. Start a new match from there." });
+          roundStartingRef.current = false;
+          setRoundStarting(false);
+          return;
+        }
+      }
+
+
+    // Pick categories for this round
+    let categories = activeCategories;
+    let listId: string | null = null;
+    if (roomCode) {
+      const next = selectNextList();
+      if (!next) {
+        toast({ title: "No lists left", description: "All lists used this match." });
+        roundStartingRef.current = false;
+        setRoundStarting(false);
+        return;
+      }
+      categories = next.categories;
+      listId = next.id;
+      setActiveCategories(categories);
+      setUsedListIds((prev) => new Set(prev).add(next.id));
+    }
+
+    const l = randomLetter();
+    setLetter(l);
+    setAnswers({});
+    setTimeLeft(timer);
+    setRunning(true);
+    setResults({});
+    setVotes({});
+    setShowResults(false);
+    setVotingActive(false);
+    setRoundCommitted(false);
+    const roundIndex = effectiveRoundsPlayed + 1;
+    setCurrentRoundIndex(roundIndex);
+    toast({ title: "Round started", description: `Letter: ${l} • ${timer} seconds` });
+    if (roomCode && channelRef.current) {
+      channelRef.current.send({ type: 'broadcast', event: 'round_start', payload: { letter: l, timer, categories, roundIndex } });
+    }
+
+    // Safety: release debounce if we don't get our own broadcast echo
+    setTimeout(() => { roundStartingRef.current = false; setRoundStarting(false); }, 500);
   };
 
-  const startTimer = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    
-    timerRef.current = setInterval(() => {
-      setTimeLeft(prev => {
-        const newTime = prev - 1;
-        
-        // Show results when timer reaches the threshold
-        if (newTime === settings.showResultsAt && !showResults) {
-          setShowResults(true);
-          if (isMultiplayer) {
-            broadcastGameState({ showResults: true });
+  const submitRound = () => {
+    setRunning(false);
+    const r: PlayerResult = { playerId, name: profileName, letter, answers } as PlayerResult;
+    setResults((prev) => ({ ...prev, [playerId]: r }));
+    submittedRef.current = true;
+    if (roomCode && channelRef.current) {
+      channelRef.current.send({ type: 'broadcast', event: 'round_submit', payload: r });
+      if (isHost) {
+        channelRef.current.send({ type: 'broadcast', event: 'round_end', payload: {} });
+      }
+    }
+    if (!roomCode || isHost) { setShowResults(true); setVotingActive(true); }
+    const totalFilled = Object.values(answers as Record<number, string>).filter((a) => a && a.trim().length > 0).length;
+    const totalCats = activeCategories.length;
+    toast({ title: "Round submitted", description: `You filled ${totalFilled}/${totalCats} categories.` });
+  };
+
+  const endRoundEarly = () => {
+    if (!roomCode || !isHost || !channelRef.current) return;
+    setRunning(false);
+    const r: PlayerResult = { playerId, name: profileName, letter, answers } as PlayerResult;
+    setResults((prev) => ({ ...prev, [playerId]: r }));
+    submittedRef.current = true;
+    channelRef.current.send({ type: 'broadcast', event: 'round_submit', payload: r });
+    channelRef.current.send({ type: 'broadcast', event: 'round_end', payload: {} });
+    setShowResults(true);
+    setVotingActive(true);
+  };
+  useEffect(() => {
+    if (!votingActive) { setVoteTimeLeft(0); return; }
+    setVoteTimeLeft(voteSeconds);
+    const id = setInterval(() => {
+      setVoteTimeLeft((t) => {
+        if (t <= 1) {
+          clearInterval(id);
+          if (isHost) {
+            if (!roundCommitted) commitRoundScores(true);
+            setShowResults(false);
+            setVotingActive(false);
+            const nextRoundNum = roundsPlayed + 1;
+            if (roomCode && nextRoundNum < roundsPerMatch) {
+              setTimeout(() => startRound(), 250);
+            }
+          } else {
+            setVotingActive(false);
           }
-        }
-        
-        // End round when timer reaches 0
-        if (newTime <= 0) {
-          endRound();
           return 0;
         }
-        
-        if (isMultiplayer && isHost) {
-          broadcastGameState({ timeLeft: newTime });
-        }
-        
-        return newTime;
+        return t - 1;
       });
     }, 1000);
-  };
-
-  const pauseTimer = () => {
-    if (!isHost) return;
-    setIsPaused(true);
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    if (isMultiplayer) {
-      broadcastGameState({ isPaused: true });
-    }
-  };
-
-  const resumeTimer = () => {
-    if (!isHost) return;
-    setIsPaused(false);
-    startTimer();
-    if (isMultiplayer) {
-      broadcastGameState({ isPaused: false });
-    }
-  };
-
-  const stopRound = () => {
-    if (!isHost) return;
-    setShowStopDialog(false);
-    endRound();
-  };
-
-  const submitEarly = () => {
-    if (!canSubmitEarly || !roundData) return;
-    
-    setRoundData(prev => prev ? { ...prev, submitted: true, submittedAt: Date.now() } : null);
-    setEarlySubmitCount(prev => prev + 1);
-    
-    if (isMultiplayer) {
-      broadcastGameState({ earlySubmitCount: earlySubmitCount + 1 });
-    }
-    
-    toast({
-      title: "Submitted early!",
-      description: "Waiting for other players or timer to end."
-    });
-  };
-
-  const endRound = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-
-    setGamePhase("results");
-    setShowResults(true);
-    
-    if (isMultiplayer && isHost) {
-      // Collect all results and broadcast
-      const roundResults = {
-        results: { [playerId]: roundData },
-        votes: votes
-      };
-      
-      channelRef.current?.send({
-        type: "broadcast",
-        event: "round_results",
-        payload: roundResults
-      });
-    }
-
-    // Check if game should end
-    if (currentRound >= settings.maxRounds) {
-      setTimeout(() => endGame(), 3000);
-    }
-  };
-
-  const nextRound = () => {
-    if (!isHost) return;
-    setCurrentRound(prev => prev + 1);
-    startNewRound();
-  };
-
-  const endGame = () => {
-    setGamePhase("final");
-    
-    // Calculate final scores and create summary
-    const playerScores = players.reduce((acc, player) => {
-      acc[player.id] = player.score || 0;
-      return acc;
-    }, {} as Record<string, number>);
-
-    const winners = players
-      .filter(p => p.score === Math.max(...players.map(p => p.score || 0)))
-      .map(p => ({ id: p.id, name: p.name, total: p.score || 0 }));
-
-    const summary: FinalSummary = {
-      totals: playerScores,
-      winners,
-      players: players.map(p => ({ id: p.id, name: p.name }))
-    };
-
-    setFinalSummary(summary);
-    setShowFinalResults(true);
-
-    if (isMultiplayer && isHost) {
-      channelRef.current?.send({
-        type: "broadcast",
-        event: "final_results",
-        payload: { summary }
-      });
-    }
-
-    playWin();
-  };
-
-  const usePowerUp = (powerUpId: string) => {
-    if (!currentPlayer) return;
-    
-    const powerUp = currentPlayer.powerUps?.find(p => p.id === powerUpId);
-    if (!powerUp || powerUp.uses >= powerUp.maxUses) return;
-
-    // Apply power-up effect
-    switch (powerUp.type) {
-      case "time_freeze":
-        pauseTimer();
-        setTimeout(() => resumeTimer(), 10000);
-        break;
-      case "peek":
-        setPeekMode(true);
-        setTimeout(() => setPeekMode(false), 15000);
-        break;
-      case "lightning":
-        if (roundData) {
-          const emptyIndex = roundData.categories.findIndex((_, i) => !roundData.answers[i]);
-          if (emptyIndex !== -1) {
-            const autoAnswer = generateAutoAnswer(roundData.categories[emptyIndex], roundData.letter);
-            setRoundData(prev => prev ? {
-              ...prev,
-              answers: { ...prev.answers, [emptyIndex]: autoAnswer }
-            } : null);
-          }
-        }
-        break;
-    }
-
-    // Update power-up usage
-    const updatedPowerUps = currentPlayer.powerUps?.map(p => 
-      p.id === powerUpId ? { ...p, uses: p.uses + 1 } : p
-    ) || [];
-
-    setCurrentPlayer(prev => prev ? { ...prev, powerUps: updatedPowerUps } : null);
-    setActivePowerUps(prev => new Set([...prev, powerUpId]));
-    
-    setTimeout(() => {
-      setActivePowerUps(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(powerUpId);
-        return newSet;
-      });
-    }, 3000);
-  };
-
-  const generateAutoAnswer = (category: string, letter: string): string => {
-    // Simple auto-answer generation based on category and letter
-    const answers: Record<string, string[]> = {
-      "Things you eat": ["Apple", "Banana", "Carrot", "Donut", "Egg"],
-      "Animals": ["Ant", "Bear", "Cat", "Dog", "Elephant"],
-      "Colors": ["Azure", "Blue", "Crimson", "Dark", "Emerald"],
-      // Add more categories as needed
-    };
-    
-    const categoryAnswers = answers[category] || ["Answer"];
-    const validAnswers = categoryAnswers.filter(a => a.startsWith(letter));
-    return validAnswers[Math.floor(Math.random() * validAnswers.length)] || `${letter}...`;
-  };
-
-  const copyRoomCode = async () => {
-    if (!roomCode) return;
-    try {
-      await navigator.clipboard.writeText(roomCode);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-      toast({ title: "Room code copied!", description: "Share it with friends to invite them." });
-    } catch {
-      toast({ title: "Failed to copy", description: "Please copy the room code manually." });
-    }
-  };
-
-  const updateAnswer = (categoryIndex: number, value: string) => {
-    setRoundData(prev => prev ? {
-      ...prev,
-      answers: { ...prev.answers, [categoryIndex]: value }
-    } : null);
-  };
-
-  const vote = (key: string) => {
-    if (!channelRef.current) return;
-    channelRef.current.send({
-      type: "broadcast",
-      event: "vote",
-      payload: { key, voterId: playerId }
-    });
-    playVote();
-  };
-
-  // Render functions
-  const renderLobby = () => (
-    <div className="grid gap-6 lg:grid-cols-3">
-      <div className="lg:col-span-2 space-y-6">
-        {/* Room Info */}
-        <Card className="glass-panel border">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  {isMultiplayer ? <Users className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-                  {isMultiplayer ? `Room ${roomCode}` : "Solo Game"}
-                </CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {isMultiplayer ? `${players.length}/${settings.maxPlayers} players` : "Practice mode"}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {isMultiplayer && (
-                  <Button variant="outline" size="sm" onClick={copyRoomCode} className="glass-card">
-                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  </Button>
-                )}
-                {isHost && (
-                  <Button variant="outline" size="sm" onClick={() => setShowSettings(true)} className="glass-card">
-                    <Settings className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {/* Players List */}
-            <div className="space-y-3">
-              {players.map(player => (
-                <div key={player.id} className="flex items-center justify-between p-3 rounded-lg glass-card border">
-                  <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarFallback style={{ backgroundImage: gradientFromString(player.name), color: "white" }}>
-                        {initialsFromName(player.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{player.name}</span>
-                        {player.isHost && <Crown className="w-4 h-4 text-yellow-500" />}
-                        {player.streak && player.streak > 0 && (
-                          <Badge variant="secondary" className="text-xs">
-                            <Flame className="w-3 h-3 mr-1" />
-                            {player.streak}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Score: {player.score || 0}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {isMultiplayer && (
-                      <Badge variant={player.isReady ? "default" : "secondary"}>
-                        {player.isReady ? "Ready" : "Not Ready"}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Ready/Start Controls */}
-            <div className="mt-6 flex items-center justify-between">
-              {isMultiplayer && !isHost && (
-                <Button onClick={toggleReady} variant={currentPlayer?.isReady ? "secondary" : "default"} className="glass-card">
-                  {currentPlayer?.isReady ? "Not Ready" : "Ready Up"}
-                </Button>
-              )}
-              {isHost && (
-                <Button onClick={startMatch} className="glass-card hover:scale-105">
-                  <Play className="w-4 h-4 mr-2" />
-                  Start Match
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Game Preview */}
-        <Card className="glass-panel border">
-          <CardHeader>
-            <CardTitle>Game Settings</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-muted-foreground">Round Time:</span>
-              <span className="ml-2 font-medium">{settings.roundTime}s</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Max Rounds:</span>
-              <span className="ml-2 font-medium">{settings.maxRounds}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Category List:</span>
-              <span className="ml-2 font-medium">
-                {CATEGORY_LISTS.find(l => l.id === settings.categoryList)?.name || "Random"}
-              </span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Power-ups:</span>
-              <span className="ml-2 font-medium">{settings.enablePowerUps ? "Enabled" : "Disabled"}</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Chat Panel */}
-      {isMultiplayer && (
-        <div className="space-y-6">
-          <ChatPanel
-            messages={chatMessages}
-            onSend={sendChatMessage}
-            currentName={playerName}
-            hostId={players.find(p => p.isHost)?.id}
-            streaks={players.reduce((acc, p) => ({ ...acc, [p.id]: p.streak || 0 }), {})}
-          />
-        </div>
-      )}
-    </div>
-  );
-
-  const renderGame = () => {
-    if (!roundData) return null;
-
-    const progress = ((settings.roundTime - timeLeft) / settings.roundTime) * 100;
-    const isTimeRunningOut = timeLeft <= 30;
-    const canShowEarlyResults = timeLeft <= settings.showResultsAt || showResults;
-
-    return (
-      <div className="grid gap-6 lg:grid-cols-4">
-        <div className="lg:col-span-3 space-y-6">
-          {/* Game Header */}
-          <Card className="glass-panel border">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-4">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-full w-16 h-16 flex items-center justify-center shadow-lg">
-                      {roundData.letter}
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-1">Letter</div>
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold">Round {currentRound + 1}</h2>
-                    <p className="text-muted-foreground">Find words starting with "{roundData.letter}"</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  {/* Timer */}
-                  <div className="text-center">
-                    <div className={`text-2xl font-bold ${isTimeRunningOut ? 'text-red-500 animate-pulse' : ''}`}>
-                      {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Time Left</div>
-                  </div>
-                  
-                  {/* Host Controls */}
-                  {isHost && (
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={isPaused ? resumeTimer : pauseTimer}
-                        className="glass-card"
-                      >
-                        {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowStopDialog(true)}
-                        className="glass-card text-red-600 hover:text-red-700"
-                      >
-                        <StopCircle className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Progress Bar */}
-              <Progress value={progress} className="h-2" />
-              
-              {/* Early Submit Info */}
-              {settings.allowEarlySubmit && !roundData.submitted && (
-                <div className="mt-4 flex items-center justify-between">
-                  <div className="text-sm text-muted-foreground">
-                    {earlySubmitCount > 0 && `${earlySubmitCount} player(s) submitted early`}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={submitEarly}
-                    disabled={!canSubmitEarly || roundData.submitted}
-                    className="glass-card"
-                  >
-                    <FastForward className="w-4 h-4 mr-2" />
-                    Submit Early
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Power-ups */}
-          {settings.enablePowerUps && currentPlayer?.powerUps && (
-            <Card className="glass-panel border">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-yellow-500" />
-                  Power-ups
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-2 flex-wrap">
-                  {currentPlayer.powerUps.map(powerUp => (
-                    <Button
-                      key={powerUp.id}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => usePowerUp(powerUp.id)}
-                      disabled={powerUp.uses >= powerUp.maxUses || activePowerUps.has(powerUp.id)}
-                      className={`glass-card ${activePowerUps.has(powerUp.id) ? 'animate-pulse bg-yellow-100' : ''}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        {powerUp.type === "time_freeze" && <Timer className="w-4 h-4" />}
-                        {powerUp.type === "double_points" && <Star className="w-4 h-4" />}
-                        {powerUp.type === "peek" && <Eye className="w-4 h-4" />}
-                        {powerUp.type === "shield" && <Shield className="w-4 h-4" />}
-                        {powerUp.type === "lightning" && <Zap className="w-4 h-4" />}
-                        <span>{powerUp.name}</span>
-                        <Badge variant="secondary" className="text-xs">
-                          {powerUp.maxUses - powerUp.uses}
-                        </Badge>
-                      </div>
-                    </Button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Categories */}
-          <Card className="glass-panel border">
-            <CardHeader>
-              <CardTitle>Categories</CardTitle>
-              {roundData.submitted && (
-                <Badge variant="secondary" className="w-fit">
-                  <CheckCircle2 className="w-4 h-4 mr-1" />
-                  Submitted
-                </Badge>
-              )}
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {roundData.categories.map((category, index) => (
-                  <div key={index} className="space-y-2">
-                    <Label className="text-sm font-medium">
-                      {index + 1}. {category}
-                    </Label>
-                    <Input
-                      value={roundData.answers[index] || ""}
-                      onChange={(e) => updateAnswer(index, e.target.value)}
-                      placeholder={`${roundData.letter}...`}
-                      disabled={roundData.submitted || isPaused}
-                      className="glass-card"
-                    />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Players Status */}
-          <Card className="glass-panel border">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                Players ({players.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {players.map(player => (
-                <div key={player.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="w-8 h-8">
-                      <AvatarFallback style={{ backgroundImage: gradientFromString(player.name), color: "white" }}>
-                        {initialsFromName(player.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm">{player.name}</span>
-                    {player.isHost && <Crown className="w-3 h-3 text-yellow-500" />}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {player.score || 0} pts
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* Chat */}
-          {isMultiplayer && (
-            <ChatPanel
-              messages={chatMessages}
-              onSend={sendChatMessage}
-              currentName={playerName}
-              hostId={players.find(p => p.isHost)?.id}
-              streaks={players.reduce((acc, p) => ({ ...acc, [p.id]: p.streak || 0 }), {})}
-            />
-          )}
-
-          {/* Sound Toggle */}
-          <Card className="glass-panel border">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                  <span className="text-sm">Sound Effects</span>
-                </div>
-                <Switch checked={soundEnabled} onCheckedChange={setSoundEnabled} />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  };
-
-  const renderResults = () => (
-    <ResultsOverlay
-      open={showResults}
-      onClose={() => setShowResults(false)}
-      results={results}
-      presentCount={players.length}
-      votes={votes}
-      onVote={vote}
-      categories={roundData?.categories || []}
-      localPlayerId={playerId}
-      voteTimeLeft={Math.max(0, timeLeft)}
-      players={players}
-    />
-  );
+    return () => clearInterval(id);
+  }, [votingActive, voteSeconds, isHost, roundsPlayed, roundsPerMatch, roomCode]);
 
   return (
     <>
       <Helmet>
-        <title>
-          {gamePhase === "lobby" 
-            ? (isMultiplayer ? `Room ${roomCode} | Scattergories Online` : "Solo Game | Scattergories Online")
-            : `Round ${currentRound + 1} | Scattergories Online`
-          }
-        </title>
-        <meta name="description" content="Play Scattergories online with friends or solo. Real-time multiplayer word game." />
+        <title>Scattergories Online — Solo Round</title>
+        <meta name="description" content="Play Scattergories online in solo mode. Random letters, timed rounds, and 12 classic categories. Start a quick round now!" />
+        <link rel="canonical" href="/game" />
       </Helmet>
-
-      <div className="relative min-h-screen card-game-bg">
+      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-primary/10 via-accent/10 to-background">
         <Aurora />
         <Particles />
-        
-        <div className="relative z-10 container py-8">
-          {gamePhase === "lobby" && renderLobby()}
-          {gamePhase === "playing" && renderGame()}
-          {gamePhase === "results" && renderResults()}
-        </div>
+        <main className="relative z-10 container mx-auto py-8">
+          <div className="rounded-xl border border-border/60 bg-background/60 backdrop-blur-xl p-4 md:p-6 shadow-[var(--shadow-elegant)]">
+            <header className="mb-4 sm:mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-lg p-3 sm:p-4 bg-gradient-to-r from-primary/10 to-transparent animate-fade-in">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Scattergories Online — {roomCode ? "Room" : "Solo"}</h1>
+                <p className="text-muted-foreground mt-1 text-sm sm:text-base">12 categories • one letter • beat the clock</p>
+              </div>
+              {roomCode && (
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="hidden md:flex -space-x-2">
+                    {players.map((p) => (
+                      <Avatar key={p.id} className="border shadow">
+                        <AvatarFallback style={{ backgroundImage: gradientFromString(p.name), color: "white" }}>
+                          {initialsFromName(p.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    ))}
+                  </div>
+                  <span className="rounded-full border px-2 py-0.5 text-xs sm:text-sm sm:px-3 sm:py-1">Room {roomCode} • {presentCount} online</span>
 
-        {/* Settings Dialog */}
-        <Dialog open={showSettings} onOpenChange={setShowSettings}>
-          <DialogContent className="glass-panel border-0 max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Game Settings</DialogTitle>
-              <DialogDescription>Customize your game experience</DialogDescription>
-            </DialogHeader>
-            
-            <Tabs defaultValue="general" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="general">General</TabsTrigger>
-                <TabsTrigger value="gameplay">Gameplay</TabsTrigger>
-                <TabsTrigger value="advanced">Advanced</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="general" className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Round Time (seconds)</Label>
-                    <Select value={settings.roundTime.toString()} onValueChange={(v) => setSettings(prev => ({ ...prev, roundTime: parseInt(v) }))}>
-                      <SelectTrigger className="glass-card">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="60">1 minute</SelectItem>
-                        <SelectItem value="90">1.5 minutes</SelectItem>
-                        <SelectItem value="120">2 minutes</SelectItem>
-                        <SelectItem value="180">3 minutes</SelectItem>
-                        <SelectItem value="300">5 minutes</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Max Rounds</Label>
-                    <Select value={settings.maxRounds.toString()} onValueChange={(v) => setSettings(prev => ({ ...prev, maxRounds: parseInt(v) }))}>
-                      <SelectTrigger className="glass-card">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1 Round</SelectItem>
-                        <SelectItem value="3">3 Rounds</SelectItem>
-                        <SelectItem value="5">5 Rounds</SelectItem>
-                        <SelectItem value="10">10 Rounds</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Category List</Label>
-                  <Select value={settings.categoryList} onValueChange={(v) => setSettings(prev => ({ ...prev, categoryList: v }))}>
-                    <SelectTrigger className="glass-card">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORY_LISTS.map(list => (
-                        <SelectItem key={list.id} value={list.id}>{list.name}</SelectItem>
-                      ))}
-                      <SelectItem value="random">Random Mix</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="gameplay" className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Allow Early Submit</Label>
-                    <p className="text-sm text-muted-foreground">Players can submit before time runs out</p>
-                  </div>
-                  <Switch 
-                    checked={settings.allowEarlySubmit} 
-                    onCheckedChange={(v) => setSettings(prev => ({ ...prev, allowEarlySubmit: v }))} 
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Show Results At (seconds remaining)</Label>
-                  <Select value={settings.showResultsAt.toString()} onValueChange={(v) => setSettings(prev => ({ ...prev, showResultsAt: parseInt(v) }))}>
-                    <SelectTrigger className="glass-card">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="30">30 seconds</SelectItem>
-                      <SelectItem value="60">1 minute</SelectItem>
-                      <SelectItem value="90">1.5 minutes</SelectItem>
-                      <SelectItem value="120">2 minutes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="advanced" className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Enable Power-ups</Label>
-                    <p className="text-sm text-muted-foreground">Special abilities during gameplay</p>
-                  </div>
-                  <Switch 
-                    checked={settings.enablePowerUps} 
-                    onCheckedChange={(v) => setSettings(prev => ({ ...prev, enablePowerUps: v }))} 
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Enable Achievements</Label>
-                    <p className="text-sm text-muted-foreground">Unlock achievements for special plays</p>
-                  </div>
-                  <Switch 
-                    checked={settings.enableAchievements} 
-                    onCheckedChange={(v) => setSettings(prev => ({ ...prev, enableAchievements: v }))} 
-                  />
-                </div>
-                
-                {isMultiplayer && (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label>Public Room</Label>
-                        <p className="text-sm text-muted-foreground">Show room in public lobby</p>
+                  <Button variant="outline" size="sm" className="hover-scale" onClick={() => {
+                      const shareUrl = `${window.location.origin}/game?room=${roomCode}`;
+                      navigator.clipboard?.writeText(shareUrl);
+                      toast({ title: "Room link copied", description: shareUrl });
+                    }}>
+                      <Share2 className="h-4 w-4 mr-2" /> Share
+                    </Button>
+
+                    <span className="hidden sm:inline rounded-full border px-2 py-0.5 text-xs sm:text-sm">Ready {readyCount}/{presentCount}</span>
+
+                    <Button
+                      variant={ready ? "secondary" : "outline"}
+                      size="sm"
+                      className="hover-scale"
+                      onClick={() => {
+                        const next = !ready;
+                        setReady(next);
+                        try { channelRef.current?.track({ id: playerId, name: profileName, online_at: new Date().toISOString(), ready: next }); } catch {}
+                      }}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" /> {ready ? "Ready" : "Ready up"}
+                    </Button>
+
+                    <Dialog>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Room settings"
+                        className="hover-scale"
+                        disabled={matchInProgress}
+                        title={matchInProgress ? "Settings are locked during a match" : undefined}
+                      >
+                        <Settings className="h-5 w-5" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Room Settings</DialogTitle>
+                        <DialogDescription>Host-only. Applies to everyone instantly.</DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4">
+                        <div className="grid gap-2">
+                          <Label>Timer</Label>
+                          <Select value={String(timer)} onValueChange={(v) => {
+                            const val = parseInt(v, 10);
+                            if (matchInProgress) {
+                              toast({ title: "Settings locked", description: "Cannot change during a match." });
+                              return;
+                            }
+                            setTimer(val);
+                            if (roomCode && isHost) channelRef.current?.send({ type: 'broadcast', event: 'room_settings', payload: { timer: val, roundsPerMatch, voteSeconds } });
+                          }} disabled={!!roomCode && (!isHost || matchInProgress)}>
+
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select duration" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                <SelectLabel>Duration</SelectLabel>
+                                <SelectItem value="60">60 seconds</SelectItem>
+                                <SelectItem value="120">120 seconds</SelectItem>
+                                <SelectItem value="180">180 seconds</SelectItem>
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Rounds per match</Label>
+                          <Select value={String(roundsPerMatch)} onValueChange={(v) => {
+                            const val = parseInt(v, 10);
+                            if (matchInProgress) {
+                              toast({ title: "Settings locked", description: "Cannot change during a match." });
+                              return;
+                            }
+                            setRoundsPerMatch(val);
+                            if (roomCode && isHost) channelRef.current?.send({ type: 'broadcast', event: 'room_settings', payload: { timer, roundsPerMatch: val, voteSeconds } });
+                          }} disabled={!!roomCode && (!isHost || matchInProgress)}>
+
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select rounds" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                <SelectLabel>Rounds</SelectLabel>
+                                {[3,5,7,9,10].map((n) => (
+                                  <SelectItem key={n} value={String(n)}>{n} rounds</SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Voting window</Label>
+                          <Select value={String(voteSeconds)} onValueChange={(v) => {
+                            const val = parseInt(v, 10);
+                            if (matchInProgress) {
+                              toast({ title: "Settings locked", description: "Cannot change during a match." });
+                              return;
+                            }
+                            setVoteSeconds(val);
+                            if (roomCode && isHost) channelRef.current?.send({ type: 'broadcast', event: 'room_settings', payload: { timer, roundsPerMatch, voteSeconds: val } });
+                          }} disabled={!!roomCode && (!isHost || matchInProgress)}>
+
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select voting time" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                <SelectLabel>Voting</SelectLabel>
+                                {[10,15,20].map((n) => (
+                                  <SelectItem key={n} value={String(n)}>{n} seconds</SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {!!roomCode && (
+                          <>
+                            <div className="grid gap-2">
+                              <Label htmlFor="room-name">Room name</Label>
+                              <Input
+                                id="room-name"
+                                value={roomName}
+                                onChange={(e) => setRoomName(e.target.value.slice(0, 40))}
+                                placeholder="e.g. Alex’s Room"
+                                disabled={!isHost || matchInProgress}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="grid gap-1">
+                                <Label htmlFor="public-toggle">Public listing</Label>
+                                <p className="text-sm text-muted-foreground">Show this room in the Lobby list.</p>
+                              </div>
+                              <Switch
+                                id="public-toggle"
+                                checked={publicListing}
+                                onCheckedChange={(v) => setPublicListing(!!v)}
+                                disabled={!isHost}
+                                aria-label="Toggle public listing"
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {!!roomCode && !isHost && (
+                          <div className="text-sm text-muted-foreground">Only the host can change settings.</div>
+                        )}
                       </div>
-                      <Switch 
-                        checked={settings.publicRoom} 
-                        onCheckedChange={(v) => setSettings(prev => ({ ...prev, publicRoom: v }))} 
-                      />
+                    </DialogContent>
+                  </Dialog>
+  
+                  <Button variant="secondary" onClick={leaveRoom} className="hover-scale">Leave Room</Button>
+                </div>
+              )}
+            </header>
+  
+            <section className="grid gap-4 md:grid-cols-[1fr,360px]">
+              <article>
+                <Card className="animate-fade-in bg-background/60 backdrop-blur-xl border border-border/60 shadow-[var(--shadow-elegant)]">
+                  <CardHeader className="flex flex-row items-center justify-between sticky top-0 z-10 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                    <CardTitle className="text-lg sm:text-xl">Your List</CardTitle>
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      {roomCode && (running || showResults || votingActive || roundsPlayed > 0) && (
+                        <div className="rounded-full border px-2 py-0.5 text-xs sm:px-3 sm:py-1">Round {displayRound}/{roundsPerMatch}</div>
+                      )}
+                      <div className="rounded-full border px-3 py-1 text-base font-semibold hidden xs:block">
+                        {letter ?? "–"}
+                      </div>
+                      <div className="w-32 sm:w-40">
+                        <Progress value={progress} />
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {running ? `${timeLeft}s remaining` : "Timer idle"}
+                        </div>
+                      </div>
+                      {votingActive && (
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full border px-2 py-0.5 text-xs sm:px-3 sm:py-1">Voting {voteTimeLeft}s</span>
+                          {isHost && (
+                            <Button variant="secondary" size="sm" onClick={() => {
+                              setVoteTimeLeft((t) => t + 5);
+                              channelRef.current?.send({ type: 'broadcast', event: 'vote_extend', payload: { add: 5 } });
+                            }}>
+                              +5s
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Max Players</Label>
-                      <Select value={settings.maxPlayers.toString()} onValueChange={(v) => setSettings(prev => ({ ...prev, maxPlayers: parseInt(v) }))}>
-                        <SelectTrigger className="glass-card">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="2">2 Players</SelectItem>
-                          <SelectItem value="4">4 Players</SelectItem>
-                          <SelectItem value="6">6 Players</SelectItem>
-                          <SelectItem value="8">8 Players</SelectItem>
-                          <SelectItem value="12">12 Players</SelectItem>
-                        </SelectContent>
-                      </Select>
+                  </CardHeader>
+                  <CardContent className="pb-4 sm:pb-6">
+                    <div className="grid gap-4">
+                      {letter && running ? (
+                        activeCategories.map((cat, idx) => (
+                          <div key={idx} className="grid gap-2">
+                            <Label htmlFor={`cat-${idx}`}>{idx + 1}. {cat}</Label>
+                            <Input
+                              id={`cat-${idx}`}
+                              placeholder={letter ? `Starts with ${letter}` : "Start a round to get a letter"}
+                              value={answers[idx] ?? ""}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                if (!letter) return;
+                                if (v.length === 0) {
+                                  setAnswers((prev) => ({ ...prev, [idx]: "" }));
+                                  return;
+                                }
+                                const first = v.trimStart().charAt(0).toUpperCase();
+                                if (first === letter.toUpperCase()) {
+                                  setAnswers((prev) => ({ ...prev, [idx]: v }));
+                                }
+                              }}
+                              disabled={!letter}
+                            />
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-sm text-muted-foreground">Categories will be revealed when the round starts.</div>
+                      )}
+                    </div>
+                    <div className="mt-4 sm:mt-6 flex items-center gap-2 sm:gap-3">
+                      <Button onClick={startRound} disabled={running || votingActive || roundStarting || (!!roomCode && (!isHost || !allReady))} className="hover-scale w-full sm:w-auto" title={roomCode && isHost && !allReady ? "Waiting for players to ready up" : undefined}>
+                        {primaryButtonLabel}
+                      </Button>
+                      {running && (
+                        <Button variant="outline" onClick={submitRound} className="hover-scale w-full sm:w-auto">
+                          Submit Round
+                        </Button>
+                      )}
+                      {roomCode && isHost && running && (
+                        <Button variant="outline" onClick={endRoundEarly} className="hover-scale w-full sm:w-auto">
+                          End Round (Host)
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </article>
+  
+              <aside>
+                {!roomCode && (
+                  <Card className="animate-fade-in bg-background/60 backdrop-blur-xl border border-border/60 shadow-[var(--shadow-elegant)]">
+                    <CardHeader>
+                      <CardTitle>Round Settings</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-4">
+                      <div className="grid gap-2">
+                        <Label>Timer</Label>
+                        <Select value={String(timer)} onValueChange={(v) => setTimer(parseInt(v, 10))}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select duration" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectLabel>Duration</SelectLabel>
+                              <SelectItem value="60">60 seconds</SelectItem>
+                              <SelectItem value="120">120 seconds</SelectItem>
+                              <SelectItem value="180">180 seconds</SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Scoring in solo mode counts filled categories. Multiplayer uniqueness rules will be added with realtime rooms.
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+  
+                {roomCode && (
+                  <>
+                    <Card className="animate-fade-in bg-background/60 backdrop-blur-xl border border-border/60 shadow-[var(--shadow-elegant)]">
+                      <CardHeader>
+                        <CardTitle>Players in Room</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ScrollArea className="h-48">
+                          <div className="space-y-3 pr-2">
+                            {players.length === 0 ? (
+                              <div className="text-sm text-muted-foreground">No players yet</div>
+                            ) : (
+                              players.map((p) => (
+                                <div key={p.id} className="flex items-center gap-3">
+                                  <Avatar className="border shadow">
+                                    <AvatarFallback style={{ backgroundImage: gradientFromString(p.name), color: "white" }}>
+                                      {initialsFromName(p.name)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="text-sm">
+                                    <div className="font-medium flex items-center gap-2">
+                                      {p.id === hostId ? <Crown className="h-3.5 w-3.5 text-primary" aria-label="Host" /> : null}
+                                      {readyMap[p.id] ? <CheckCircle className="h-3.5 w-3.5 text-primary" aria-label="Ready" /> : null}
+                                      {p.name} {p.id === playerId ? <span className="text-muted-foreground">(You)</span> : null}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </ScrollArea>
+                      </CardContent>
+                    </Card>
+  
+                    <div className="mt-6 animate-fade-in">
+                      <ChatPanel
+                        messages={messages}
+                        onSend={(text) => {
+                          if (!channelRef.current) return;
+                          const payload = { id: playerId, name: profileName, text, ts: Date.now() } as ChatMessage;
+                          channelRef.current.send({ type: 'broadcast', event: 'chat', payload });
+                          setMessages((m) => [...m, payload].slice(-200));
+                        }}
+                        currentName={profileName}
+                        hostId={hostId}
+                        leaderId={leaderId ?? undefined}
+                        streaks={streaks}
+                      />
                     </div>
                   </>
                 )}
-              </TabsContent>
-            </Tabs>
-          </DialogContent>
-        </Dialog>
-
-        {/* Stop Round Dialog */}
-        <AlertDialog open={showStopDialog} onOpenChange={setShowStopDialog}>
-          <AlertDialogContent className="glass-panel border-0">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-red-500" />
-                Stop Round Early?
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                This will immediately end the current round and show results. This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={stopRound} className="bg-red-600 hover:bg-red-700">
-                Stop Round
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* Final Results */}
-        {finalSummary && (
+              </aside>
+            </section>
+          </div>
+        </main>
+      </div>
+      {roomCode && (
+        <>
+          <ResultsOverlay
+            open={showResults}
+            onClose={() => setShowResults(false)}
+            results={results}
+            presentCount={presentCount}
+            votes={votes}
+            onVote={(key) => {
+              if (!channelRef.current) return;
+              channelRef.current.send({ type: 'broadcast', event: 'vote', payload: { key, voterId: playerId } });
+              setVotes((prev) => {
+                const set = new Set([...(prev[key] || [])]);
+                set.add(playerId);
+                return { ...prev, [key]: Array.from(set) };
+              });
+              playVote();
+            }}
+            categories={activeCategories}
+            localPlayerId={playerId}
+            voteTimeLeft={voteTimeLeft}
+            players={players}
+          />
           <FinalScoreboard
-            open={showFinalResults}
-            onClose={() => setShowFinalResults(false)}
-            summary={finalSummary}
+            open={finalOpen}
+            onClose={() => setFinalOpen(false)}
+            summary={matchSummary}
             isHost={isHost}
             onPlayAgain={() => {
-              setShowFinalResults(false);
-              setGamePhase("lobby");
-              setCurrentRound(0);
-              // Reset player scores
-              setPlayers(prev => prev.map(p => ({ ...p, score: 0 })));
+              setFinalOpen(false);
+              setMatchTotals({});
+              setStreaks({});
+              setLeaderId(null);
+              setUsedListIds(new Set());
+              setRoundsPlayed(0);
+              setCurrentRoundIndex(0);
+              startRound();
             }}
           />
-        )}
-      </div>
+        </>
+      )}
     </>
   );
-}
+};
+
+export default Game;

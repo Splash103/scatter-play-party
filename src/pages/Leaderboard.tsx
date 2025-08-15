@@ -4,6 +4,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { gradientFromString, initialsFromName } from "@/lib/gradient";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import Aurora from "@/components/Aurora";
+import Particles from "@/components/Particles";
 
 interface Row {
   user_id: string | null;

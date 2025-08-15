@@ -110,10 +110,14 @@ const Auth = () => {
         <link rel="canonical" href="/auth" />
       </Helmet>
       
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-accent/10 to-background p-4">
-        <Card className="w-full max-w-md">
+      <div className="relative min-h-screen flex items-center justify-center card-game-bg p-4">
+        <Aurora />
+        <Particles />
+        <Card className="relative z-10 w-full max-w-md glass-panel">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold">Scattergories Online</CardTitle>
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Scattergories Online
+            </CardTitle>
             <CardDescription>
               Sign in to track your wins and compete on the global leaderboard
             </CardDescription>
@@ -135,7 +139,7 @@ const Auth = () => {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="Enter your email"
-                      required
+                      required className="glass-card"
                       disabled={loading}
                     />
                   </div>
@@ -147,11 +151,11 @@ const Auth = () => {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your password"
-                      required
+                      required className="glass-card"
                       disabled={loading}
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full glass-card hover:scale-105" disabled={loading}>
                     {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                     Sign In
                   </Button>
@@ -168,7 +172,7 @@ const Auth = () => {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="Enter your email"
-                      required
+                      required className="glass-card"
                       disabled={loading}
                     />
                   </div>
@@ -180,12 +184,12 @@ const Auth = () => {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Create a password"
-                      required
+                      required className="glass-card"
                       disabled={loading}
                       minLength={6}
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full glass-card hover:scale-105" disabled={loading}>
                     {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                     Sign Up
                   </Button>
@@ -194,7 +198,7 @@ const Auth = () => {
             </Tabs>
             
             <div className="mt-6 text-center">
-              <Button variant="ghost" onClick={() => navigate('/')}>
+              <Button variant="ghost" onClick={() => navigate('/')} className="glass-card hover:scale-105">
                 Continue as Guest
               </Button>
             </div>

@@ -122,21 +122,34 @@ export function ResultsOverlay({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-5xl">
+      <DialogContent className="max-w-6xl glass-panel border-0">
         <DialogHeader className="sm:flex sm:items-center sm:justify-between">
-          <DialogTitle>Round Results</DialogTitle>
-          <div className="text-sm text-muted-foreground">Voting ends in {voteTimeLeft}s</div>
+          <DialogTitle className="text-3xl font-bold bg-gradient-to-r from-primary via-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Round Results
+          </DialogTitle>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+            <span className="text-sm text-muted-foreground font-medium">
+              Voting ends in {voteTimeLeft}s
+            </span>
+          </div>
         </DialogHeader>
+        
         <div className="space-y-4">
           {entries.length === 0 ? (
-            <div className="text-sm text-muted-foreground">Waiting for submissions…</div>
+            <div className="text-center py-12">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              </div>
+              <div className="text-lg font-medium text-muted-foreground">Waiting for submissions…</div>
+            </div>
           ) : (
             <>
               <div className="relative">
-                <Carousel setApi={setCarouselApi} opts={{ align: "center" }}>
+                <Carousel setApi={setCarouselApi} opts={{ align: "center", loop: true }}>
                   <CarouselContent>
                     {entries.map((r) => (
-                      <CarouselItem key={r.playerId} className="md:basis-3/4 lg:basis-2/3">
+                      <CarouselItem key={r.playerId} className="md:basis-4/5 lg:basis-3/4 xl:basis-2/3">
                         <PlayerResultCard
                           r={r}
                           categories={categories}
@@ -151,10 +164,24 @@ export function ResultsOverlay({
                       </CarouselItem>
                     ))}
                   </CarouselContent>
-                  <CarouselPrevious className="left-2 top-1/2 -translate-y-1/2" />
-                  <CarouselNext className="right-2 top-1/2 -translate-y-1/2" />
+                  <CarouselPrevious className="left-4 top-1/2 -translate-y-1/2 glass-card hover:scale-110" />
+                  <CarouselNext className="right-4 top-1/2 -translate-y-1/2 glass-card hover:scale-110" />
                 </Carousel>
-                <div className="mt-3 text-center text-sm text-muted-foreground">{index + 1} / {entries.length}</div>
+                <div className="mt-6 flex items-center justify-center gap-2">
+                  {entries.map((_, idx) => (
+                    <div
+                      key={idx}
+                      className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                        idx === index 
+                          ? 'bg-primary scale-125' 
+                          : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <div className="mt-2 text-center text-sm text-muted-foreground font-medium">
+                  {index + 1} of {entries.length} players
+                </div>
               </div>
             </>
           )}

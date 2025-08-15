@@ -1065,6 +1065,7 @@ export default function Game() {
                         <SelectItem value="120">2 minutes</SelectItem>
                         <SelectItem value="180">3 minutes</SelectItem>
                         <SelectItem value="300">5 minutes</SelectItem>
+                       <SelectItem value="30">30 seconds</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

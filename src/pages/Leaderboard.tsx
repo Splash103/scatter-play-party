@@ -65,20 +65,25 @@ export default function Leaderboard() {
       </Helmet>
 
       <div className="min-h-screen bg-background">
-        <div className="container py-8">
+        <div className="relative min-h-screen card-game-bg">
+          <Aurora />
+          <Particles />
+          <div className="relative z-10 container py-8">
           <header className="mb-6 flex items-center justify-between">
-            <h1 className="text-3xl font-bold tracking-tight">Leaderboard</h1>
+            <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-yellow-500 via-orange-500 to-red-500 bg-clip-text text-transparent">
+              Champions Leaderboard
+            </h1>
           </header>
 
           {isLoading ? (
-            <Card className="animate-fade-in">
+            <Card className="glass-panel animate-fade-in">
               <CardHeader>
                 <CardTitle>Loading…</CardTitle>
                 <CardDescription>Fetching top players.</CardDescription>
               </CardHeader>
             </Card>
           ) : list.length === 0 ? (
-            <Card className="animate-fade-in">
+            <Card className="glass-panel animate-fade-in">
               <CardHeader>
                 <CardTitle>No scores yet</CardTitle>
                 <CardDescription>Play some rounds and your stats will appear here.</CardDescription>
@@ -87,9 +92,11 @@ export default function Leaderboard() {
           ) : (
             <div className="grid gap-4">
               {list.map((e, idx) => (
-                <Card key={`${e.name}-${idx}`} className="hover-scale animate-fade-in">
+                <Card key={`${e.name}-${idx}`} className="glass-card floating-card animate-fade-in" style={{ animationDelay: `${idx * 0.1}s` }}>
                   <CardContent className="flex items-center gap-4 py-4">
-                    <div className="w-10 text-center font-semibold text-muted-foreground">#{idx + 1}</div>
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                      #{idx + 1}
+                    </div>
                     <Avatar>
                       <AvatarFallback style={{ backgroundImage: gradientFromString(e.name), color: "white" }}>
                         {initialsFromName(e.name)}
@@ -108,6 +115,8 @@ export default function Leaderboard() {
               ))}
             </div>
           )}
+          </div>
+        </div>
         </div>
       </div>
     </>

@@ -56,7 +56,7 @@ const Lobby = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-primary/10 via-accent/10 to-background">
+    <div className="relative min-h-screen card-game-bg">
       <Aurora />
       <Particles />
       <Helmet>
@@ -70,7 +70,7 @@ const Lobby = () => {
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 py-8">
         <header className="mb-8 text-center">
-          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+          <h1 className="text-5xl font-bold tracking-tight bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
             Game Lobby
           </h1>
           <p className="mt-2 text-lg text-muted-foreground">
@@ -91,7 +91,7 @@ const Lobby = () => {
         <div className="grid gap-6 lg:grid-cols-4">
           {/* Main Rooms Section */}
           <div className="lg:col-span-3">
-            <Card className="animate-fade-in bg-background/60 backdrop-blur-xl border border-border/60 shadow-[var(--shadow-elegant)]">
+            <Card className="glass-panel animate-fade-in">
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
@@ -102,7 +102,7 @@ const Lobby = () => {
                     <CardDescription>Join instantly or browse by activity</CardDescription>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={syncNow} className="hover-scale">
+                    <Button variant="outline" size="sm" onClick={syncNow} className="glass-card hover:scale-105">
                       <RefreshCw className="w-4 h-4 mr-2" />
                       Refresh
                     </Button>
@@ -117,11 +117,11 @@ const Lobby = () => {
                       placeholder="Search rooms, codes, or hosts..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 glass-card"
                     />
                   </div>
                   <Select value={filterStatus} onValueChange={(value: "all" | "open" | "in-match") => setFilterStatus(value)}>
-                    <SelectTrigger className="w-48">
+                    <SelectTrigger className="w-48 glass-card">
                       <Filter className="w-4 h-4 mr-2" />
                       <SelectValue />
                     </SelectTrigger>
@@ -148,7 +148,7 @@ const Lobby = () => {
                       }
                     </p>
                     {!searchTerm && filterStatus === "all" && (
-                      <Button onClick={() => navigate("/")} variant="outline">
+                      <Button onClick={() => navigate("/")} variant="outline" className="glass-card hover:scale-105">
                         <Play className="w-4 h-4 mr-2" />
                         Create Room
                       </Button>
@@ -159,7 +159,7 @@ const Lobby = () => {
                     {filteredRooms.map((room) => (
                       <Card
                         key={room.code}
-                        className="group hover-scale bg-gradient-to-r from-primary/5 to-accent/5 border-border/60 transition-all duration-200 hover:shadow-lg hover:border-primary/20"
+                        className="group glass-card card-stack transition-all duration-300 hover:shadow-lg hover:border-primary/20"
                       >
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between mb-3">
@@ -217,7 +217,7 @@ const Lobby = () => {
                               size="sm" 
                               onClick={() => join(room.code)}
                               disabled={room.players >= room.maxPlayers}
-                              className="hover-scale"
+                              className="glass-card hover:scale-105"
                             >
                               {room.players >= room.maxPlayers ? "Full" : "Join"}
                             </Button>
@@ -234,7 +234,7 @@ const Lobby = () => {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Quick Join */}
-            <Card className="animate-fade-in bg-background/60 backdrop-blur-xl border border-border/60 shadow-[var(--shadow-elegant)]">
+            <Card className="glass-panel animate-fade-in">
               <CardHeader>
                 <CardTitle className="text-lg">Quick Join</CardTitle>
                 <CardDescription>Enter a room code to join directly</CardDescription>
@@ -244,12 +244,12 @@ const Lobby = () => {
                   value={joinCode}
                   onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                   placeholder="ABCD"
-                  className="font-mono text-center text-lg"
+                  className="font-mono text-center text-lg glass-card"
                   maxLength={6}
                 />
                 <Button 
                   onClick={() => join(joinCode)} 
-                  className="w-full hover-scale"
+                  className="w-full glass-card hover:scale-105"
                   disabled={!joinCode.trim()}
                 >
                   <Play className="w-4 h-4 mr-2" />
@@ -259,7 +259,7 @@ const Lobby = () => {
             </Card>
 
             {/* Quick Actions */}
-            <Card className="animate-fade-in bg-background/60 backdrop-blur-xl border border-border/60 shadow-[var(--shadow-elegant)]">
+            <Card className="glass-panel animate-fade-in">
               <CardHeader>
                 <CardTitle className="text-lg">Quick Actions</CardTitle>
               </CardHeader>
@@ -267,7 +267,7 @@ const Lobby = () => {
                 <Button 
                   onClick={() => navigate("/")} 
                   variant="outline" 
-                  className="w-full hover-scale"
+                  className="w-full glass-card hover:scale-105"
                 >
                   <Play className="w-4 h-4 mr-2" />
                   Create Room
@@ -275,7 +275,7 @@ const Lobby = () => {
                 <Button 
                   onClick={() => navigate("/game")} 
                   variant="outline" 
-                  className="w-full hover-scale"
+                  className="w-full glass-card hover:scale-105"
                 >
                   <Users className="w-4 h-4 mr-2" />
                   Solo Play
@@ -283,7 +283,7 @@ const Lobby = () => {
                 <Button 
                   onClick={() => navigate("/leaderboard")} 
                   variant="outline" 
-                  className="w-full hover-scale"
+                  className="w-full glass-card hover:scale-105"
                 >
                   <Crown className="w-4 h-4 mr-2" />
                   Leaderboard
@@ -292,7 +292,7 @@ const Lobby = () => {
             </Card>
 
             {/* Stats */}
-            <Card className="animate-fade-in bg-background/60 backdrop-blur-xl border border-border/60 shadow-[var(--shadow-elegant)]">
+            <Card className="glass-panel animate-fade-in">
               <CardHeader>
                 <CardTitle className="text-lg">Lobby Stats</CardTitle>
               </CardHeader>

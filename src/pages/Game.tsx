@@ -444,6 +444,8 @@ const Game = () => {
                     )}
                   </div>
                   
+                </CardHeader>
+                <CardContent>
                   <div>
                     <label className="text-sm font-medium mb-2 block">Round Time</label>
                     <select
@@ -458,16 +460,16 @@ const Game = () => {
                       <option value={120}>2 minutes</option>
                     </select>
                   </div>
-                </div>
                 
-                <div className="grid gap-4 sm:grid-cols-1">
-                  {(phase === "playing" || phase === "voting") && (
-                    <Progress 
-                      value={((phase === "playing" ? roundTime : VOTE_TIME) - timeLeft) / (phase === "playing" ? roundTime : VOTE_TIME) * 100} 
-                      className="mt-4"
-                    />
-                  )}
-                </CardHeader>
+                  <div className="grid gap-4 sm:grid-cols-1">
+                    {(phase === "playing" || phase === "voting") && (
+                      <Progress 
+                        value={((phase === "playing" ? roundTime : VOTE_TIME) - timeLeft) / (phase === "playing" ? roundTime : VOTE_TIME) * 100} 
+                        className="mt-4"
+                      />
+                    )}
+                  </div>
+                </CardContent>
               </Card>
 
               {/* Lobby Phase */}

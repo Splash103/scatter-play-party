@@ -159,37 +159,37 @@ const Lobby = () => {
                     {filteredRooms.map((room) => (
                       <Card
                         key={room.code}
-                        className="group glass-card transition-all duration-300 hover:shadow-lg border border-border/60 hover:border-primary/30"
+                        className="group glass-card card-stack transition-all duration-300 hover:shadow-lg hover:border-primary/20"
                       >
-                        <CardContent className="p-4 bg-background/40 rounded-lg border border-border/20">
+                        <CardContent className="p-4">
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="font-mono border-border/60">
+                              <Badge variant="outline" className="font-mono">
                                 {room.code}
                               </Badge>
                               {room.inMatch ? (
-                                <Badge variant="secondary" className="text-xs border border-border/40">
+                                <Badge variant="secondary" className="text-xs">
                                   <Clock className="w-3 h-3 mr-1" />
                                   In Progress
                                 </Badge>
                               ) : (
-                                <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border border-green-200 dark:border-green-800">
+                                <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                                   <UserPlus className="w-3 h-3 mr-1" />
                                   Open
                                 </Badge>
                               )}
                             </div>
-                            <div className="text-right text-xs text-muted-foreground/80">
+                            <div className="text-right text-xs text-muted-foreground">
                               {formatTimeAgo(room.createdAtISO)}
                             </div>
                           </div>
                           
                           <div className="mb-3">
-                            <h3 className="font-medium text-base mb-1 group-hover:text-primary transition-colors text-foreground">
+                            <h3 className="font-medium text-base mb-1 group-hover:text-primary transition-colors">
                               {room.name}
                             </h3>
                             {room.hostName && (
-                              <div className="flex items-center gap-2 text-sm text-muted-foreground/90">
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Crown className="w-3 h-3" />
                                 <span>Hosted by {room.hostName}</span>
                               </div>
@@ -198,7 +198,7 @@ const Lobby = () => {
 
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <Avatar className="w-6 h-6 border border-border/60">
+                              <Avatar className="w-6 h-6 border">
                                 <AvatarFallback 
                                   style={{ 
                                     backgroundImage: gradientFromString(room.hostName || room.code), 
@@ -209,7 +209,7 @@ const Lobby = () => {
                                   {initialsFromName(room.hostName || room.code)}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="text-sm text-muted-foreground/90">
+                              <span className="text-sm text-muted-foreground">
                                 {room.players}/{room.maxPlayers} players
                               </span>
                             </div>

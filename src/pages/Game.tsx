@@ -230,9 +230,21 @@ usePublicRoomAdvertiser({
         setPlayers(list.map(({ id, name, online_at }) => ({ id, name, online_at })));
         setReadyMap(Object.fromEntries(list.map(p => [p.id, !!p.ready])));
         setPresentCount(list.length || 1);
-        const withTs = list.map((p) => ({ ...p, ts: Date.parse(p.online_at || '') || Date.now() }));
-        withTs.sort((a, b) => a.ts - b.ts);
-        setHostId(withTs[0]?.id ?? null);
+        
+        // More reliable host assignment: keep the first person who joined as host
+        // Only change host if current host leaves
+        if (list.length > 0) {
+          const currentHost = hostId;
+          const currentHostStillPresent = list.some(p => p.id === currentHost);
+          
+          if (!currentHost || !currentHostStillPresent) {
+            // No host set yet or current host left, assign to the person with earliest timestamp
+            const withTs = list.map((p) => ({ ...p, ts: Date.parse(p.online_at || '') || Date.now() }));
+            withTs.sort((a, b) => a.ts - b.ts);
+            setHostId(withTs[0]?.id ?? null);
+          }
+          // Otherwise keep the current host
+        }
       })
       .on('broadcast', { event: 'chat' }, ({ payload }) => {
         setMessages((m) => [...m, payload as ChatMessage].slice(-200));
@@ -316,7 +328,12 @@ usePublicRoomAdvertiser({
         setLeaderId(p.leaderId ?? null);
       })
       .on('broadcast', { event: 'match_end' }, ({ payload }) => {
-        const p = payload as { winners: { id: string; name: string; total: number }[]; matchId?: string };
+        const p = payload as { 
+          winners: { id: string; name: string; total: number }[]; 
+          matchId?: string; 
+          totals?: Record<string, number>; 
+          players?: { id: string; name: string }[] 
+        };
         // Update local leaderboard (legacy local storage)
         try {
           const raw = localStorage.getItem('leaderboard');
@@ -348,12 +365,19 @@ usePublicRoomAdvertiser({
           }
         })();
 
-        // Show final scoreboard to non-host clients too
+        // Show final scoreboard to all players using the data from the broadcast
         if (!isHost) {
-          const currentPlayers = players.map((pl) => ({ id: pl.id, name: pl.name }));
-          const totals: Record<string, number> = { ...matchTotals };
-          for (const pl of currentPlayers) { if (totals[pl.id] === undefined) totals[pl.id] = 0; }
-          setMatchSummary({ winners: p.winners, totals, players: currentPlayers });
+          // Use the broadcast totals and players if available, otherwise fall back to local data
+          const broadcastTotals = p.totals || {};
+          const broadcastPlayers = p.players || players.map((pl) => ({ id: pl.id, name: pl.name }));
+          const totals: Record<string, number> = { ...broadcastTotals };
+          
+          // Ensure all players have a score entry
+          for (const pl of broadcastPlayers) { 
+            if (totals[pl.id] === undefined) totals[pl.id] = 0; 
+          }
+          
+          setMatchSummary({ winners: p.winners, totals, players: broadcastPlayers });
           setFinalOpen(true);
         }
         // Reset match state
@@ -507,8 +531,8 @@ usePublicRoomAdvertiser({
     setFinalOpen(true);
     playWin();
 
-    // Broadcast to room (include match id)
-    channelRef.current?.send({ type: 'broadcast', event: 'match_end', payload: { winners, matchId } });
+    // Broadcast to room (include match id and totals for other players to display scoreboard)
+    channelRef.current?.send({ type: 'broadcast', event: 'match_end', payload: { winners, matchId, totals, players: currentPlayers } });
     channelRef.current?.send({ type: 'broadcast', event: 'scores_state', payload: {
       matchTotals: totals,
       streaks: newStreaks,

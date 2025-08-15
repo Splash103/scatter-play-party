@@ -33,6 +33,7 @@ export function usePublicRoomAdvertiser({ enabled, roomCode, payload, players, i
 
     channel.subscribe(async (status) => {
       if (status !== "SUBSCRIBED") return;
+      console.log(`[Room Advertiser] Subscribed to public_rooms channel for room ${roomCode}`);
       try {
         await channel.track({
           roomCode,
@@ -44,7 +45,10 @@ export function usePublicRoomAdvertiser({ enabled, roomCode, payload, players, i
           inMatch,
           updatedAtISO: new Date().toISOString(),
         });
-      } catch {}
+        console.log(`[Room Advertiser] Tracking room ${roomCode} with ${players} players`);
+      } catch (error) {
+        console.error(`[Room Advertiser] Failed to track room ${roomCode}:`, error);
+      }
     });
 
     return () => {
@@ -59,6 +63,7 @@ export function usePublicRoomAdvertiser({ enabled, roomCode, payload, players, i
   useEffect(() => {
     const ch = channelRef.current;
     if (!ch) return;
+    console.log(`[Room Advertiser] Updating room ${roomCode} presence: ${players} players, inMatch: ${inMatch}`);
     try {
       ch.track({
         roomCode,
@@ -70,6 +75,8 @@ export function usePublicRoomAdvertiser({ enabled, roomCode, payload, players, i
         inMatch,
         updatedAtISO: new Date().toISOString(),
       });
-    } catch {}
+    } catch (error) {
+      console.error(`[Room Advertiser] Failed to update room ${roomCode}:`, error);
+    }
   }, [players, inMatch, payload.name, payload.hostName, payload.maxPlayers, payload.createdAtISO, roomCode]);
 }

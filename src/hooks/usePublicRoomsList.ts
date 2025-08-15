@@ -20,6 +20,7 @@ export function usePublicRoomsList() {
     const ch = channelRef.current;
     if (!ch) return;
     const state = ch.presenceState() as Record<string, any[]>;
+    console.log(`[Public Rooms] Syncing presence state:`, state);
     const list: PublicRoom[] = Object.entries(state).map(([key, presences]) => {
       const p = presences?.[0] || {};
       const code = p.roomCode || key;
@@ -35,6 +36,7 @@ export function usePublicRoomsList() {
     });
     // Sort: by players desc, then createdAt asc
     list.sort((a, b) => (b.players - a.players) || (new Date(a.createdAtISO).getTime() - new Date(b.createdAtISO).getTime()));
+    console.log(`[Public Rooms] Found ${list.length} rooms:`, list);
     setRooms(list);
   };
 

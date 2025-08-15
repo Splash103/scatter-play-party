@@ -628,7 +628,7 @@ export default function Game() {
     return scores;
   };
 
-  const showFinalResults = async (finalScores: Record<string, number>) => {
+  const displayFinalResults = async (finalScores: Record<string, number>) => {
     // Find the highest score
     const maxScore = Math.max(...Object.values(finalScores));
     const winners = Object.entries(finalScores)
@@ -670,7 +670,7 @@ export default function Game() {
         });
         
       if (error) {
-        console.error('Error recording win:', error);
+        await displayFinalResults(totals);
       } else {
         // Update profile streak
         const { error: profileError } = await supabase.rpc('update_win_streak', {

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { gradientFromString, initialsFromName } from "@/lib/gradient";
-import { Users, RefreshCw, Clock, Crown, Play, UserPlus, Search, Filter } from "lucide-react";
+import { Users, RefreshCw, Clock, Crown, Play, UserPlus, Search, Filter, Gamepad2 } from "lucide-react";
 import { usePublicRoomsList } from "@/hooks/usePublicRoomsList";
 import { toast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";

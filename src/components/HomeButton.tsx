@@ -7,6 +7,11 @@ export default function HomeButton() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
+  // Don't show home button on game page
+  if (location.pathname.startsWith("/game")) {
+    return null;
+  }
+
   const goHome = useCallback(() => {
     const isGame = location.pathname.startsWith("/game");
     const inRoom = !!searchParams.get("room");

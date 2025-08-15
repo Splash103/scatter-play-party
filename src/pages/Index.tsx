@@ -65,7 +65,7 @@ const Index = () => {
             </Button>
           </div>
           <header className="text-center mb-12 mt-8">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-normal w-fit mx-auto bg-gradient-to-r from-blue-600 via-blue-600 to-purple-600 bg-clip-text text-transparent mb-4 pt-2">
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-normal w-fit mx-auto bg-gradient-to-r from-blue-600 via-blue-600 to-purple-600 bg-clip-text text-transparent mb-4 pt-2">
               Scattergories Online
             </h1>
             <p className="text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
@@ -74,75 +74,75 @@ const Index = () => {
           </header>
 
           <main className="grid gap-8 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 mb-8">
-            <Card className="glass-card floating-card group cursor-pointer hover:shadow-2xl transition-all duration-500 border-0 bg-gradient-to-br from-white/10 to-white/5" style={{ animationDelay: '0s' }}>
+            <Card className="glass-card floating-card group cursor-pointer" style={{ animationDelay: '0s' }}>
               <CardHeader className="text-center pb-4">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
                   <Gamepad2 className="text-white w-8 h-8" />
                 </div>
-                <CardTitle className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Quick Play</CardTitle>
-                <CardDescription className="text-sm opacity-90 leading-relaxed">Jump into a game instantly with AI or friends</CardDescription>
+                <CardTitle className="text-xl">Quick Play</CardTitle>
+                <CardDescription className="text-sm opacity-80">Jump into a game instantly</CardDescription>
               </CardHeader>
               <CardFooter>
-                <Button onClick={() => setPlayOpen(true)} aria-label="Open play options" className="w-full glass-card hover:scale-105 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-0 shadow-lg">
+                <Button onClick={() => setPlayOpen(true)} aria-label="Open play options" className="w-full glass-card hover:scale-105">
                   Start Playing
                 </Button>
               </CardFooter>
             </Card>
 
-            <Card className="glass-card floating-card group cursor-pointer hover:shadow-2xl transition-all duration-500 border-0 bg-gradient-to-br from-white/10 to-white/5" style={{ animationDelay: '0.2s' }}>
+            <Card className="glass-card floating-card group cursor-pointer" style={{ animationDelay: '0.2s' }}>
               <CardHeader className="text-center pb-4">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center shadow-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
                   <Users className="text-white w-8 h-8" />
                 </div>
-                <CardTitle className="text-xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">Game Lobby</CardTitle>
-                <CardDescription className="text-sm opacity-90 leading-relaxed">Browse and join active multiplayer rooms</CardDescription>
+                <CardTitle className="text-xl">Game Lobby</CardTitle>
+                <CardDescription className="text-sm opacity-80">Join active multiplayer rooms</CardDescription>
               </CardHeader>
               <CardFooter>
-                <Button asChild aria-label="Open lobby" className="w-full glass-card hover:scale-105 bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white border-0 shadow-lg">
+                <Button asChild aria-label="Open lobby" className="w-full glass-card hover:scale-105">
                   <Link to="/lobby">Browse Rooms</Link>
                 </Button>
               </CardFooter>
             </Card>
 
-            <Card className="glass-card floating-card group cursor-pointer hover:shadow-2xl transition-all duration-500 border-0 bg-gradient-to-br from-white/10 to-white/5" style={{ animationDelay: '0.4s' }}>
+            <Card className="glass-card floating-card group cursor-pointer" style={{ animationDelay: '0.4s' }}>
               <CardHeader className="text-center pb-4">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
                   <UserCircle2 className="text-white w-8 h-8" />
                 </div>
-                <CardTitle className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Player Profile</CardTitle>
-                <CardDescription className="text-sm opacity-90 leading-relaxed">Customize your gaming identity and stats</CardDescription>
+                <CardTitle className="text-xl">Player Profile</CardTitle>
+                <CardDescription className="text-sm opacity-80">Customize your gaming identity</CardDescription>
               </CardHeader>
               <CardContent className="flex items-center justify-center gap-3 py-4">
-                <Avatar className="w-12 h-12 border-2 border-white/20 shadow-lg">
+                <Avatar>
                   <AvatarFallback style={{ backgroundImage: gradientFromString(name || "Player"), color: "white" }}>
                     {initialsFromName(name || "P")}
                   </AvatarFallback>
                 </Avatar>
-                <div className="text-sm text-center font-medium">
+                <div className="text-sm text-center">
                   {name ? (
-                    <span className="text-foreground">{name}</span>
+                    <span className="font-medium">{name}</span>
                   ) : (
-                    <span className="text-muted-foreground italic">Anonymous</span>
+                    <span className="text-muted-foreground">Anonymous</span>
                   )}
                 </div>
               </CardContent>
               <CardFooter>
-                <Button variant="secondary" onClick={() => setProfileOpen(true)} aria-label="Edit profile" className="w-full glass-card hover:scale-105 bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 border border-purple-500/30 shadow-lg">
+                <Button variant="secondary" onClick={() => setProfileOpen(true)} aria-label="Edit profile" className="w-full glass-card hover:scale-105">
                   {name ? "Edit Profile" : "Set Name"}
                 </Button>
               </CardFooter>
             </Card>
 
-            <Card className="glass-card floating-card group cursor-pointer hover:shadow-2xl transition-all duration-500 border-0 bg-gradient-to-br from-white/10 to-white/5" style={{ animationDelay: '0.6s' }}>
+            <Card className="glass-card floating-card group cursor-pointer" style={{ animationDelay: '0.6s' }}>
               <CardHeader className="text-center pb-4">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-yellow-500 to-orange-600 flex items-center justify-center shadow-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-yellow-500 to-orange-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
                   <Trophy className="text-white w-8 h-8" />
                 </div>
-                <CardTitle className="text-xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">Champions</CardTitle>
-                <CardDescription className="text-sm opacity-90 leading-relaxed">View top players and global rankings</CardDescription>
+                <CardTitle className="text-xl">Champions</CardTitle>
+                <CardDescription className="text-sm opacity-80">View top players and stats</CardDescription>
               </CardHeader>
               <CardFooter>
-                <Button asChild aria-label="Open leaderboard" className="w-full glass-card hover:scale-105 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white border-0 shadow-lg">
+                <Button asChild aria-label="Open leaderboard" className="w-full glass-card hover:scale-105">
                   <Link to="/leaderboard">View Rankings</Link>
                 </Button>
               </CardFooter>

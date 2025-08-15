@@ -628,6 +628,7 @@ export default function Game() {
     return scores;
   };
 
+    setResultsOpen(false); // Stop the results timer loop
   const showFinalResults = async (finalScores: Record<string, number>) => {
     // Find the highest score
     const maxScore = Math.max(...Object.values(finalScores));

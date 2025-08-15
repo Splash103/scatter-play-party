@@ -70,7 +70,7 @@ const Lobby = () => {
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 py-8">
         <header className="mb-8 text-center">
-          <h1 className="text-5xl font-bold tracking-tight text-white">
+          <h1 className="text-5xl font-bold tracking-tight text-black dark:text-white">
             Game Lobby
           </h1>
           <p className="mt-2 text-lg text-muted-foreground">

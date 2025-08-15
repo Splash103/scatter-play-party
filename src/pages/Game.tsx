@@ -200,6 +200,7 @@ export default function Game() {
   const [results, setResults] = useState<Record<string, any>>({});
   const [finalSummary, setFinalSummary] = useState<FinalSummary | null>(null);
   const [resultsOpen, setResultsOpen] = useState(false);
+  const [showRoundTransition, setShowRoundTransition] = useState(false);
   
   // Rock Paper Scissors state
   const [showRockPaperScissors, setShowRockPaperScissors] = useState(false);

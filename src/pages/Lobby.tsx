@@ -91,7 +91,7 @@ const Lobby = () => {
         <div className="grid gap-6 lg:grid-cols-4">
           {/* Main Rooms Section */}
           <div className="lg:col-span-3">
-            <Card className="glass-panel animate-fade-in">
+            <Card className="glass-panel animate-fade-in border">
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
@@ -159,7 +159,7 @@ const Lobby = () => {
                     {filteredRooms.map((room) => (
                       <Card
                         key={room.code}
-                        className="group glass-card card-stack transition-all duration-300 hover:shadow-lg hover:border-primary/20"
+                        className="group glass-card card-stack transition-all duration-300 hover:shadow-lg hover:border-primary/20 border"
                       >
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between mb-3">
@@ -234,7 +234,7 @@ const Lobby = () => {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Quick Join */}
-            <Card className="glass-panel animate-fade-in">
+            <Card className="glass-panel animate-fade-in border">
               <CardHeader>
                 <CardTitle className="text-lg">Quick Join</CardTitle>
                 <CardDescription>Enter a room code to join directly</CardDescription>
@@ -259,7 +259,7 @@ const Lobby = () => {
             </Card>
 
             {/* Quick Actions */}
-            <Card className="glass-panel animate-fade-in">
+            <Card className="glass-panel animate-fade-in border">
               <CardHeader>
                 <CardTitle className="text-lg">Quick Actions</CardTitle>
               </CardHeader>
@@ -292,7 +292,7 @@ const Lobby = () => {
             </Card>
 
             {/* Stats */}
-            <Card className="glass-panel animate-fade-in">
+            <Card className="glass-panel animate-fade-in border">
               <CardHeader>
                 <CardTitle className="text-lg">Lobby Stats</CardTitle>
               </CardHeader>

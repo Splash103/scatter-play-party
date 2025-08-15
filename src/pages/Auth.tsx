@@ -115,7 +115,7 @@ const Auth = () => {
         <Particles />
         <Card className="relative z-10 w-full max-w-md glass-panel">
           <CardHeader className="text-center">
-            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <CardTitle className="text-3xl font-bold text-white">
               Scattergories Online
             </CardTitle>
             <CardDescription>

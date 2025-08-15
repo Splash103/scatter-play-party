@@ -62,6 +62,7 @@ const Game = () => {
   
   // Room state
   const [players, setPlayers] = useState<Player[]>([]);
+  const presentPlayers = useMemo(() => players.filter(p => p.present), [players]);
   const [hostId, setHostId] = useState<string | null>(null);
   const isHost = !roomCode || hostId === playerId;
   const isPlayerHost = hostId === playerId;

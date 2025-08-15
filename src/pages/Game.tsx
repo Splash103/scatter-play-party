@@ -90,6 +90,7 @@ const createdAtRef = useRef<string>(new Date().toISOString());
 const [roomName, setRoomName] = useState<string>(() => `${(profileName || 'Player')}'s Room`);
 const [publicListing, setPublicListing] = useState<boolean>(false);
 const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+const [roomCreator, setRoomCreator] = useState<string | null>(null);
 const [messages, setMessages] = useState<ChatMessage[]>([]);
 const [presentCount, setPresentCount] = useState<number>(1);
   const [players, setPlayers] = useState<{ id: string; name: string; online_at?: string }[]>([]);
@@ -215,6 +216,13 @@ usePublicRoomAdvertiser({
 
   useEffect(() => {
     if (!roomCode) return;
+    
+    // Set this player as room creator if they're first to join
+    if (!roomCreator) {
+      setRoomCreator(playerId);
+      setHostId(playerId); // Make room creator the initial host
+    }
+    
     const channel = supabase.channel(`room_${roomCode}`, { config: { presence: { key: playerId } } });
     channelRef.current = channel;
 
@@ -231,19 +239,22 @@ usePublicRoomAdvertiser({
         setReadyMap(Object.fromEntries(list.map(p => [p.id, !!p.ready])));
         setPresentCount(list.length || 1);
         
-        // More reliable host assignment: keep the first person who joined as host
-        // Only change host if current host leaves
+        // Host assignment: prioritize room creator, then first person to join
         if (list.length > 0) {
           const currentHost = hostId;
           const currentHostStillPresent = list.some(p => p.id === currentHost);
           
           if (!currentHost || !currentHostStillPresent) {
-            // No host set yet or current host left, assign to the person with earliest timestamp
-            const withTs = list.map((p) => ({ ...p, ts: Date.parse(p.online_at || '') || Date.now() }));
-            withTs.sort((a, b) => a.ts - b.ts);
-            setHostId(withTs[0]?.id ?? null);
+            // If we know who created the room and they're present, make them host
+            if (roomCreator && list.some(p => p.id === roomCreator)) {
+              setHostId(roomCreator);
+            } else {
+              // Otherwise assign to the person with earliest timestamp
+              const withTs = list.map((p) => ({ ...p, ts: Date.parse(p.online_at || '') || Date.now() }));
+              withTs.sort((a, b) => a.ts - b.ts);
+              setHostId(withTs[0]?.id ?? null);
+            }
           }
-          // Otherwise keep the current host
         }
       })
       .on('broadcast', { event: 'chat' }, ({ payload }) => {

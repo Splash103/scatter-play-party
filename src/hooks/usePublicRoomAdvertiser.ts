@@ -20,7 +20,9 @@ export function usePublicRoomAdvertiser({ enabled, roomCode, payload, players, i
 
   // Subscribe/unsubscribe when enabled changes
   useEffect(() => {
+    console.log(`[Room Advertiser] Effect triggered - enabled: ${enabled}, roomCode: ${roomCode}`);
     if (!enabled || !roomCode) {
+      console.log(`[Room Advertiser] Disabling advertiser - enabled: ${enabled}, roomCode: ${roomCode}`);
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;

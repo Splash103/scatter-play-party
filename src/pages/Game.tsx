@@ -461,6 +461,12 @@ const Game = () => {
                         </Button>
                       </div>
                     )}
+                    
+                    {!isPlayerHost && (
+                      <div className="text-center text-sm text-muted-foreground">
+                        Waiting for host to start the game...
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}

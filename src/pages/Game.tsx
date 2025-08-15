@@ -1047,12 +1047,24 @@ export default function Game() {
       </div>
 
       {/* Chat Panel */}
+        {/* Round Transition */}
+        {showRoundTransition && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="glass-panel p-8 text-center animate-scale-in">
+              <h2 className="text-4xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent mb-4">
+                {transitionText}
+              </h2>
+              <div className="w-16 h-16 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          </div>
+        )}
+
       {isMultiplayer && (
         <div className="space-y-6">
           <ChatPanel
             messages={chatMessages}
             onSend={sendChatMessage}
-            currentName={playerName}
+            hostId={roomCreatorId}
             hostId={players.find(p => p.isHost)?.id}
             streaks={players.reduce((acc, p) => ({ ...acc, [p.id]: p.streak || 0 }), {})}
           />

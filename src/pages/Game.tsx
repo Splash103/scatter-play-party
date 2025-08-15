@@ -535,14 +535,14 @@ const Game = () => {
         </div>
 
         <div className="relative z-10 container mx-auto px-4 py-6">
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid gap-6 lg:grid-cols-4">
             {/* Main Game Area */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-3 space-y-6">
               {/* Game Status */}
               <Card className="glass-panel">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <div className="flex-1">
+                    <div>
                       <CardTitle className="flex items-center gap-2">
                         {phase === "lobby" && <Users className="w-5 h-5 text-primary" />}
                         {phase === "playing" && <Timer className="w-5 h-5 text-green-500" />}
@@ -562,70 +562,45 @@ const Game = () => {
                       </CardDescription>
                     </div>
                     
-                    <div className="flex items-center gap-4">
-                      {(phase === "playing" || phase === "voting") && (
-                        <div className="text-center">
-                          <div className="text-4xl font-bold text-primary tabular-nums">{timeLeft}</div>
-                          <div className="text-xs text-muted-foreground uppercase tracking-wide">seconds</div>
-                        </div>
-                      )}
-                      
-                      {/* Round Progress */}
-                      {phase !== "lobby" && (
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-muted-foreground">{currentRound}</div>
-                          <div className="text-xs text-muted-foreground uppercase tracking-wide">of {totalRounds}</div>
-                        </div>
-                      )}
-                    </div>
+                    {(phase === "playing" || phase === "voting") && (
+                      <div className="text-right">
+                        <div className="text-3xl font-bold text-primary">{timeLeft}</div>
+                        <div className="text-sm text-muted-foreground">seconds</div>
+                      </div>
+                    )}
                   </div>
-                  
-                  {/* Progress Bar */}
-                  {(phase === "playing" || phase === "voting") && (
-                    <div className="mt-4">
-                      <div className="flex justify-between text-xs text-muted-foreground mb-2">
-                        <span>Progress</span>
-                        <span>{Math.round(((phase === "playing" ? roundTime : voteTime) - timeLeft) / (phase === "playing" ? roundTime : voteTime) * 100)}%</span>
-                      </div>
-                      <Progress 
-                        value={((phase === "playing" ? roundTime : voteTime) - timeLeft) / (phase === "playing" ? roundTime : voteTime) * 100} 
-                        className="h-2"
-                      />
-                    </div>
-                  )}
                 </CardHeader>
+                <CardContent>
+                  {(phase === "playing" || phase === "voting") && (
+                    <Progress 
+                      value={((phase === "playing" ? roundTime : voteTime) - timeLeft) / (phase === "playing" ? roundTime : voteTime) * 100} 
+                      className="mt-4"
+                    />
+                  )}
+                </CardContent>
               </Card>
-
-              {/* Letter Display - Only show during playing phase */}
-              {phase === "playing" && letter && (
-                <Card className="glass-panel">
-                  <CardContent className="py-6">
-                    <div className="flex items-center justify-center gap-6">
-                      <div className="text-center">
-                        <div className="text-sm text-muted-foreground uppercase tracking-wide mb-2">Round Letter</div>
-                        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-4xl font-bold shadow-lg">
-                          {letter}
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-sm text-muted-foreground uppercase tracking-wide mb-2">Categories</div>
-                        <div className="text-3xl font-bold text-primary">{categories.length}</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
 
               {/* Lobby Phase */}
               {phase === "lobby" && (
                 <Card className="glass-panel">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle>Game Setup</CardTitle>
-                        <CardDescription>Configure your game settings</CardDescription>
-                      </div>
+                    <CardTitle>Game Setup</CardTitle>
+                    <CardDescription>Configure your game settings</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="text-center text-muted-foreground">
+                      <p>Current settings: <strong>{selectedList.name}</strong> • <strong>{totalRounds} Round{totalRounds !== 1 ? 's' : ''}</strong></p>
                       {isPlayerHost && (
+                        <p className="text-xs mt-1">Use the settings button to configure game options</p>
+                      )}
+                    </div>
+                    
+                    {isPlayerHost && (
+                      <div className="flex gap-2">
+                        <Button onClick={startRound} className="glass-card hover:scale-105">
+                          <Play className="w-4 h-4 mr-2" />
+                          Start Game
+                        </Button>
                         <Button
                           variant="outline"
                           onClick={() => setSelectedList(generateRandomList())}
@@ -634,43 +609,12 @@ const Game = () => {
                           <Shuffle className="w-4 h-4 mr-2" />
                           Random Categories
                         </Button>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Game Settings Display */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-lg bg-muted/20">
-                      <div className="text-center">
-                        <div className="text-sm text-muted-foreground">Categories</div>
-                        <div className="font-semibold">{selectedList.name}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-sm text-muted-foreground">Rounds</div>
-                        <div className="font-semibold">{totalRounds}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-sm text-muted-foreground">Round Time</div>
-                        <div className="font-semibold">{roundTime}s</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-sm text-muted-foreground">Vote Time</div>
-                        <div className="font-semibold">{voteTime}s</div>
-                      </div>
-                    </div>
-                    
-                    {isPlayerHost && (
-                      <div className="flex gap-2 justify-center">
-                        <Button onClick={startRound} className="glass-card hover:scale-105">
-                          <Play className="w-4 h-4 mr-2" />
-                          Start Game
-                        </Button>
                       </div>
                     )}
                     
                     {!isPlayerHost && (
-                      <div className="text-center p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20">
-                        <Users className="w-8 h-8 mx-auto mb-2 text-blue-500" />
-                        <p className="text-sm text-muted-foreground">Waiting for host to start the game...</p>
+                      <div className="text-center text-sm text-muted-foreground">
+                        Waiting for host to start the game...
                       </div>
                     )}
                   </CardContent>
@@ -680,54 +624,56 @@ const Game = () => {
               {/* Playing Phase */}
               {phase === "playing" && (
                 <div className="space-y-6">
-                  <Card className="glass-panel">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
+                <Card className="glass-panel">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold">
+                          {letter}
+                        </div>
                         <div>
                           <CardTitle>Answer Categories</CardTitle>
                           <CardDescription>
-                            Fill in your answers below
+                            Find words that start with "{letter}" for each category below
                           </CardDescription>
                         </div>
-                        {isPlayerHost && (
-                          <Button 
-                            variant="destructive" 
-                            size="sm" 
-                            onClick={forceEndRound}
-                            className="glass-card hover:scale-105"
-                          >
-                            Force End Round
-                          </Button>
-                        )}
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {categories.map((category, index) => (
-                          <div key={index} className="space-y-2">
-                            <label className="text-sm font-medium flex items-center gap-2">
-                              <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">
-                                {index + 1}
-                              </span>
-                              {category}
-                            </label>
-                            <Input
-                              value={answers[index] || ""}
-                              onChange={(e) => setAnswers(prev => ({ ...prev, [index]: e.target.value }))}
-                              placeholder={`Something starting with ${letter}...`}
-                              className="glass-card"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                      
-                      <div className="mt-6 flex justify-center">
-                        <Button onClick={submitAnswers} className="glass-card hover:scale-105 px-8">
-                          Submit Answers
+                      {isPlayerHost && (
+                        <Button 
+                          variant="destructive" 
+                          size="sm" 
+                          onClick={forceEndRound}
+                          className="glass-card hover:scale-105"
+                        >
+                          Force End Round
                         </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {categories.map((category, index) => (
+                        <div key={index} className="space-y-2">
+                          <label className="text-sm font-medium">
+                            {index + 1}. {category}
+                          </label>
+                          <Input
+                            value={answers[index] || ""}
+                            onChange={(e) => setAnswers(prev => ({ ...prev, [index]: e.target.value }))}
+                            placeholder={`Something starting with ${letter}...`}
+                            className="glass-card"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="mt-6 flex justify-center">
+                      <Button onClick={submitAnswers} className="glass-card hover:scale-105">
+                        Submit Answers
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
                 </div>
               )}
 
@@ -787,23 +733,18 @@ const Game = () => {
             </div>
 
             {/* Sidebar */}
-            <div className="lg:col-span-1 space-y-6">
+            <div className="space-y-6">
               {/* Players */}
               <Card className="glass-panel">
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="w-5 h-5" />
-                      Players
-                    </CardTitle>
-                    <Badge variant="secondary" className="glass-card">
-                      {presentPlayers.length}/8
-                    </Badge>
-                  </div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    Players ({presentPlayers.length})
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {presentPlayers.map((player) => (
-                    <div key={player.id} className="flex items-center gap-3 p-3 rounded-lg glass-card hover:bg-accent/50 transition-colors">
+                    <div key={player.id} className="flex items-center gap-3 p-2 rounded-lg glass-card">
                       <Avatar className="w-8 h-8">
                         <AvatarFallback style={{ backgroundImage: gradientFromString(player.name), color: "white" }}>
                           {initialsFromName(player.name)}
@@ -813,19 +754,14 @@ const Game = () => {
                         <div className="flex items-center gap-2">
                           <span className="font-medium truncate">{player.name}</span>
                           {player.id === hostId && <Crown className="w-4 h-4 text-yellow-500" />}
-                          {player.id === playerId && (
-                            <Badge variant="outline" className="text-xs px-1 py-0">You</Badge>
-                          )}
+                          {player.id === playerId && <span className="text-xs text-primary">(You)</span>}
                         </div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                          <span className="flex items-center gap-1">
-                            <Trophy className="w-3 h-3" />
-                            {scores[player.id] || 0}
-                          </span>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>Score: {scores[player.id] || 0}</span>
                           {streaks[player.id] > 0 && (
-                            <span className="flex items-center gap-1 text-orange-500 font-medium">
+                            <span className="flex items-center gap-1 text-orange-500">
                               <Flame className="w-3 h-3" />
-                              ×{streaks[player.id]}
+                              {streaks[player.id]}
                             </span>
                           )}
                         </div>
@@ -834,7 +770,7 @@ const Game = () => {
                   ))}
                   
                   {roomCode && presentPlayers.length < 8 && (
-                    <div className="text-center p-4 border-2 border-dashed border-border/50 rounded-lg bg-muted/20">
+                    <div className="text-center p-4 border-2 border-dashed border-border rounded-lg">
                       <UserPlus className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                       <p className="text-sm text-muted-foreground">
                         Share room code <strong>{roomCode}</strong> to invite friends
@@ -843,34 +779,6 @@ const Game = () => {
                   )}
                 </CardContent>
               </Card>
-
-              {/* Game Controls - Only show for host */}
-              {isPlayerHost && phase === "lobby" && (
-                <Card className="glass-panel">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Settings className="w-5 h-5" />
-                      Host Controls
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowSettings(true)}
-                      className="w-full glass-card hover:scale-105"
-                    >
-                      <Settings className="w-4 h-4 mr-2" />
-                      Game Settings
-                    </Button>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Room Visibility</span>
-                      <Badge variant={isPublic ? "default" : "secondary"} className="glass-card">
-                        {isPublic ? "Public" : "Private"}
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
 
               {/* Chat */}
               {roomCode && showChat && (

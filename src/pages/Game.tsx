@@ -64,6 +64,7 @@ const Game = () => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [hostId, setHostId] = useState<string | null>(null);
   const isHost = !roomCode || hostId === playerId;
+  const isPlayerHost = hostId === playerId;
   const [isPublic, setIsPublic] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem("soundEnabled") !== "false");
   
@@ -285,9 +286,6 @@ const Game = () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
-
-  const presentPlayers = players.filter(p => p.present);
-  const isPlayerHost = hostId === playerId;
 
   if (!playerName) {
     return (

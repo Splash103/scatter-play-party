@@ -106,7 +106,7 @@ export default function Leaderboard() {
                     </Avatar>
                     <div className="flex-1">
                       <div className="font-medium">{e.name}</div>
-                      <div className="text-sm text-muted-foreground flex gap-3 flex-wrap">
+                      <div className="text-sm text-muted-foreground flex gap-3">
                         <span>Wins: {e.wins}</span>
                         {typeof e.current_streak === "number" && <span>Streak: {e.current_streak}</span>}
                         {typeof e.best_streak === "number" && <span>Best: {e.best_streak}</span>}

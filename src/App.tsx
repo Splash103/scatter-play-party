@@ -9,8 +9,6 @@ import NotFound from "./pages/NotFound";
 import Game from "./pages/Game";
 import Leaderboard from "./pages/Leaderboard";
 import Lobby from "./pages/Lobby";
-import Shop from "./pages/Shop";
-import Inventory from "./pages/Inventory";
 import { ThemeProvider } from "next-themes";
 import HomeButton from "@/components/HomeButton";
 import Auth from "./pages/Auth";
@@ -31,8 +29,6 @@ const App = () => (
               <Route path="/game" element={<Game />} />
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/lobby" element={<Lobby />} />
-              <Route path="/shop" element={<Shop />} />
-              <Route path="/inventory" element={<Inventory />} />
               <Route path="/auth" element={<Auth />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

@@ -279,6 +279,8 @@ export default function Game() {
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState();
         const playerList = Object.entries(state).map(([id, presences]) => {
+        if (payload.hostId) setHostId(payload.hostId);
+        if (payload.roomCreatorId) setRoomCreatorId(payload.roomCreatorId);
           const presence = presences[0] as any;
           return {
             id,
@@ -313,7 +315,15 @@ export default function Game() {
           ...prev,
           [payload.key]: [...(prev[payload.key] || []), payload.voterId]
         }));
+        if (payload.hostId) setHostId(payload.hostId);
+        if (payload.roomCreatorId) setRoomCreatorId(payload.roomCreatorId);
         playVote();
+      })
+      .on("broadcast", { event: "round_transition" }, ({ payload }) => {
+        console.log("Round transition:", payload);
+        setTransitionText(payload.text);
+        setShowRoundTransition(true);
+        setTimeout(() => setShowRoundTransition(false), 3000);
       })
       .on("broadcast", { event: "round_results" }, ({ payload }) => {
         setResults(payload.results);
@@ -628,7 +638,7 @@ export default function Game() {
     return scores;
   };
 
-  const displayFinalResults = async (finalScores: Record<string, number>) => {
+  const showFinalResults = async (finalScores: Record<string, number>) => {
     // Find the highest score
     const maxScore = Math.max(...Object.values(finalScores));
     const winners = Object.entries(finalScores)
@@ -670,7 +680,7 @@ export default function Game() {
         });
         
       if (error) {
-        await displayFinalResults(totals);
+        console.error('Error recording win:', error);
       } else {
         // Update profile streak
         const { error: profileError } = await supabase.rpc('update_win_streak', {

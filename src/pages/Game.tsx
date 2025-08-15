@@ -180,6 +180,7 @@ export default function Game() {
   const [currentRound, setCurrentRound] = useState(0);
   const [roundData, setRoundData] = useState<RoundData | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
+  const [votingTimeLeft, setVotingTimeLeft] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [earlySubmitCount, setEarlySubmitCount] = useState(0);
@@ -205,6 +206,7 @@ export default function Game() {
   const [rpsChoices, setRpsChoices] = useState<Record<string, string>>({});
   const [rpsResults, setRpsResults] = useState<string | null>(null);
   const [tiedPlayers, setTiedPlayers] = useState<Player[]>([]);
+  const [matchWinner, setMatchWinner] = useState<{ id: string; name: string } | null>(null);
   
   // Refs and hooks
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -366,6 +368,7 @@ export default function Game() {
     if (payload.currentRound !== undefined) setCurrentRound(payload.currentRound);
     if (payload.roundData) setRoundData(payload.roundData);
     if (payload.timeLeft !== undefined) setTimeLeft(payload.timeLeft);
+    if (payload.votingTimeLeft !== undefined) setVotingTimeLeft(payload.votingTimeLeft);
     if (payload.isPaused !== undefined) setIsPaused(payload.isPaused);
     if (payload.earlySubmitCount !== undefined) setEarlySubmitCount(payload.earlySubmitCount);
     if (payload.showResults !== undefined) setShowResults(payload.showResults);
@@ -434,6 +437,7 @@ export default function Game() {
 
     setRoundData(newRoundData);
     setTimeLeft(settings.roundTime);
+    setVotingTimeLeft(0);
     setGamePhase("playing");
     setShowResults(false);
     setEarlySubmitCount(0);
@@ -446,6 +450,7 @@ export default function Game() {
         phase: "playing",
         roundData: newRoundData,
         timeLeft: settings.roundTime,
+        votingTimeLeft: 0,
         currentRound: currentRound + 1,
         showResults: false,
         earlySubmitCount: 0
@@ -484,6 +489,19 @@ export default function Game() {
       });
     }, 1000);
   };
+
+  // Voting timer
+  useEffect(() => {
+    if (gamePhase === "voting" && votingTimeLeft > 0) {
+      const timer = setTimeout(() => {
+        setVotingTimeLeft(prev => prev - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (gamePhase === "voting" && votingTimeLeft === 0) {
+      // Voting time ended, show results
+      showRoundResults();
+    }
+  }, [votingTimeLeft, gamePhase]);
 
   const pauseTimer = () => {
     if (!isHost) return;
@@ -583,6 +601,91 @@ export default function Game() {
     }
   };
 
+  const showRoundResults = () => {
+    // Calculate scores and determine round winner
+    const scores = calculateRoundScores();
+    
+    // Check if this was the final round
+    if (currentRound >= settings.maxRounds) {
+      // Final round - show final results
+      showFinalResults(scores);
+    } else {
+      // Move to next round after a brief delay
+      setTimeout(() => {
+        startNextRound();
+      }, 3000);
+    }
+  };
+
+  const calculateRoundScores = () => {
+    const scores: Record<string, number> = {};
+    
+    Object.values(results).forEach(result => {
+      const score = scoreFor(result);
+      scores[result.playerId] = (scores[result.playerId] || 0) + score;
+    });
+    
+    return scores;
+  };
+
+  const showFinalResults = async (finalScores: Record<string, number>) => {
+    // Find the highest score
+    const maxScore = Math.max(...Object.values(finalScores));
+    const winners = Object.entries(finalScores)
+      .filter(([_, score]) => score === maxScore)
+      .map(([playerId, score]) => ({
+        id: playerId,
+        name: players.find(p => p.id === playerId)?.name || "Player",
+        score
+      }));
+
+    if (winners.length === 1) {
+      // Single winner
+      const winner = winners[0];
+      setMatchWinner(winner);
+      await recordWin(winner.id);
+      setGamePhase("final");
+    } else {
+      // Tie - need rock paper scissors
+      setTiedPlayers(winners.map(w => ({ id: w.id, name: w.name })));
+      setGamePhase("rps");
+    }
+  };
+
+  const recordWin = async (winnerId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return; // Only record wins for authenticated users
+      
+      // Check if the winner is the current authenticated user
+      const winnerPlayer = players.find(p => p.id === winnerId);
+      if (!winnerPlayer || winnerPlayer.id !== playerId) return;
+      
+      // Record the win in the database
+      const { error } = await supabase
+        .from('match_wins')
+        .insert({
+          user_id: user.id,
+          match_id: `${roomCode}-${Date.now()}` // Simple match ID
+        });
+        
+      if (error) {
+        console.error('Error recording win:', error);
+      } else {
+        // Update profile streak
+        const { error: profileError } = await supabase.rpc('update_win_streak', {
+          user_id: user.id
+        });
+        
+        if (profileError) {
+          console.error('Error updating streak:', profileError);
+        }
+      }
+    } catch (error) {
+      console.error('Error in recordWin:', error);
+    }
+  };
+
   const nextRound = () => {
     if (!isHost) return;
     setCurrentRound(prev => prev + 1);
@@ -632,6 +735,46 @@ export default function Game() {
     }
 
     playWin();
+  };
+
+  const startNextRound = () => {
+    const nextRound = currentRound + 1;
+    setCurrentRound(nextRound);
+    setGamePhase("playing");
+    setTimeLeft(settings.roundTime);
+    setVotingTimeLeft(0);
+    setRoundData(null);
+    setResults({});
+    setVotes({});
+    setShowResults(false);
+    setEarlySubmitCount(0);
+    
+    // Generate new round data
+    const categoryList = CATEGORY_LISTS.find(l => l.id === settings.categoryList) || generateRandomList();
+    const letter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
+    
+    const newRoundData: RoundData = {
+      letter,
+      categories: categoryList.categories.slice(0, 12),
+      answers: {},
+      submitted: false
+    };
+    
+    setRoundData(newRoundData);
+    
+    if (isMultiplayer) {
+      broadcastGameState({
+        phase: "playing",
+        roundData: newRoundData,
+        timeLeft: settings.roundTime,
+        votingTimeLeft: 0,
+        currentRound: nextRound,
+        showResults: false,
+        earlySubmitCount: 0
+      });
+    }
+    
+    startTimer();
   };
 
   const usePowerUp = (powerUpId: string) => {
@@ -1153,7 +1296,7 @@ export default function Game() {
         onVote={vote}
         categories={roundData.categories}
         localPlayerId={playerId}
-        voteTimeLeft={Math.max(0, timeLeft)}
+        voteTimeLeft={votingTimeLeft}
         players={players}
       />
     );

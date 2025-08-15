@@ -202,6 +202,7 @@ export default function Game() {
   const [resultsOpen, setResultsOpen] = useState(false);
   const [showRoundTransition, setShowRoundTransition] = useState(false);
   const [roomCreatorId, setRoomCreatorId] = useState<string | null>(null);
+  const [finalScoreboardOpen, setFinalScoreboardOpen] = useState(false);
   
   // Rock Paper Scissors state
   const [showRockPaperScissors, setShowRockPaperScissors] = useState(false);
@@ -668,7 +669,7 @@ export default function Game() {
       const { error } = await supabase
         .from('match_wins')
         .insert({
-          user_id: user.id,
+  const handlePostResults = useCallback(() => {
           match_id: `${roomCode}-${Date.now()}` // Simple match ID
         });
         
@@ -686,6 +687,12 @@ export default function Game() {
       }
     } catch (error) {
       console.error('Error in recordWin:', error);
+    }
+  }, [resultsOpen, gamePhase, currentRound, maxRounds]);
+
+  useEffect(() => {
+    if (resultsOpen && gamePhase === "results") {
+      handlePostResults();
     }
   };
 

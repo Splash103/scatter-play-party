@@ -199,6 +199,7 @@ export default function Game() {
   const [votes, setVotes] = useState<Record<string, string[]>>({});
   const [results, setResults] = useState<Record<string, any>>({});
   const [finalSummary, setFinalSummary] = useState<FinalSummary | null>(null);
+  const [resultsOpen, setResultsOpen] = useState(false);
   
   // Rock Paper Scissors state
   const [showRockPaperScissors, setShowRockPaperScissors] = useState(false);

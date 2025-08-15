@@ -188,7 +188,6 @@ export default function Game() {
   
   // UI state
   const [showSettings, setShowSettings] = useState(false);
-  const [showFinalResults, setShowFinalResults] = useState(false);
   const [showStopDialog, setShowStopDialog] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [copied, setCopied] = useState(false);

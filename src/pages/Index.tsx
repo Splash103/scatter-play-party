@@ -74,7 +74,6 @@ const Index = () => {
             </p>
           </header>
 
-          <main className="grid gap-8 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 mb-8">
           <main className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 mb-8">
             <Card className="glass-card floating-card group cursor-pointer" style={{ animationDelay: '0s' }}>
               <CardHeader className="text-center pb-4">

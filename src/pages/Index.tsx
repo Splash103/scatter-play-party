@@ -75,6 +75,7 @@ const Index = () => {
           </header>
 
           <main className="grid gap-8 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 mb-8">
+          <main className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 mb-8">
             <Card className="glass-card floating-card group cursor-pointer" style={{ animationDelay: '0s' }}>
               <CardHeader className="text-center pb-4">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">

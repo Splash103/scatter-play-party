@@ -14,6 +14,8 @@ interface Row {
   wins: number | null;
   best_streak: number | null;
   current_streak: number | null;
+  total_games_played?: number | null;
+  average_score?: number | null;
 }
 
 export default function Leaderboard() {
@@ -22,7 +24,7 @@ export default function Leaderboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("v_leaderboard")
-        .select("display_name, total_wins, current_streak, best_streak")
+        .select("display_name, total_wins, current_streak, best_streak, total_games_played, average_score")
         .order("total_wins", { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -33,6 +35,8 @@ export default function Leaderboard() {
         wins: row.total_wins || 0,
         current_streak: row.current_streak || 0,
         best_streak: row.best_streak || 0,
+        total_games_played: row.total_games_played || 0,
+        average_score: row.average_score || 0,
       })) as Row[];
     },
   });
@@ -44,6 +48,8 @@ export default function Leaderboard() {
       wins: r.wins || 0,
       best_streak: r.best_streak || 0,
       current_streak: r.current_streak || 0,
+      total_games_played: r.total_games_played || 0,
+      average_score: r.average_score || 0,
     })).slice(0, 10);
   } else {
     // Fallback to local storage if no Supabase data
@@ -106,10 +112,12 @@ export default function Leaderboard() {
                     </Avatar>
                     <div className="flex-1">
                       <div className="font-medium">{e.name}</div>
-                      <div className="text-sm text-muted-foreground flex gap-3">
+                      <div className="text-sm text-muted-foreground flex gap-3 flex-wrap">
                         <span>Wins: {e.wins}</span>
                         {typeof e.current_streak === "number" && <span>Streak: {e.current_streak}</span>}
                         {typeof e.best_streak === "number" && <span>Best: {e.best_streak}</span>}
+                        {typeof e.total_games_played === "number" && <span>Games: {e.total_games_played}</span>}
+                        {typeof e.average_score === "number" && e.average_score > 0 && <span>Avg: {e.average_score}</span>}
                       </div>
                     </div>
                   </CardContent>

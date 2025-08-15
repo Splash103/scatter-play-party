@@ -688,7 +688,7 @@ export default function Game() {
     } catch (error) {
       console.error('Error in recordWin:', error);
     }
-  }, [resultsOpen, gamePhase, currentRound, maxRounds]);
+  }, [gamePhase, finalScoreboardOpen, currentRound, maxRounds]);
 
   useEffect(() => {
     if (resultsOpen && gamePhase === "results") {

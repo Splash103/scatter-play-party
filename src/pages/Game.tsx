@@ -1,742 +1,1089 @@
-import { useEffect, useState, useRef, useMemo, useCallback } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
-import { gradientFromString, initialsFromName } from "@/lib/gradient";
-import { CATEGORY_LISTS, generateRandomList, type CategoryList } from "@/data/categoryLists";
-import { ChatPanel, type ChatMessage } from "@/components/ChatPanel";
-import { ResultsOverlay, type PlayerResult } from "@/components/ResultsOverlay";
-import { FinalScoreboard, type FinalSummary } from "@/components/FinalScoreboard";
-import { usePublicRoomAdvertiser } from "@/hooks/usePublicRoomAdvertiser";
-import { useGameSounds } from "@/hooks/use-sound";
 import { supabase } from "@/integrations/supabase/client";
-import Aurora from "@/components/Aurora";
+import { Switch } from "@/components/ui/switch";
+import { usePublicRoomAdvertiser } from "@/hooks/usePublicRoomAdvertiser";
+import { ChatPanel, ChatMessage } from "@/components/ChatPanel";
+import { ResultsOverlay, PlayerResult } from "@/components/ResultsOverlay";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { gradientFromString, initialsFromName } from "@/lib/gradient";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Settings, Crown, Flame, Volume2, VolumeX, CheckCircle, Share2 } from "lucide-react";
 import Particles from "@/components/Particles";
-import {
-  Clock,
-  Users,
-  Play,
-  Pause,
-  RotateCcw,
-  Settings,
-  Crown,
-  Flame,
-  Trophy,
-  Volume2,
-  VolumeX,
-  Copy,
-  Check,
-  Shuffle,
-  List,
-  Home,
-} from "lucide-react";
+import Aurora from "@/components/Aurora";
+import { CATEGORY_LISTS, generateRandomList } from "@/data/categoryLists";
+import { FinalScoreboard } from "@/components/FinalScoreboard";
+import { useGameSounds } from "@/hooks/use-sound";
+const DEFAULT_CATEGORIES = [
+  "Fruits",
+  "Countries",
+  "Things in a bedroom",
+  "TV Shows",
+  "Things that are cold",
+  "Animals",
+  "Occupations",
+  "Colors",
+  "Sports",
+  "Things you wear",
+  "In the kitchen",
+  "City names",
+];
 
-// Game constants
-const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const ROUND_TIME = 90; // seconds
-const VOTE_TIME = 30; // seconds
+const ALLOWED_LETTERS = [
+  "A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","R","S","T","W"
+];
 
-// Game state types
-type GamePhase = "lobby" | "playing" | "voting" | "results" | "final";
-type Player = { id: string; name: string; isHost?: boolean };
+function randomLetter() {
+  return ALLOWED_LETTERS[Math.floor(Math.random() * ALLOWED_LETTERS.length)];
+}
+
+// Normalize answers for duplicate detection
+function normalizeAnswer(s: string) {
+  return (s || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+// Alliteration bonus: at least two words starting with the round letter
+function isAlliteration(s: string, letter: string) {
+  const l = (letter || "").toUpperCase();
+  if (!l) return false;
+  const words = (s || "").trim().split(/\s+/);
+  let count = 0;
+  for (const w of words) {
+    if (w.charAt(0).toUpperCase() === l) count++;
+  }
+  return count >= 2;
+}
 
 const Game = () => {
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const roomCode = searchParams.get("room");
-  const isMultiplayer = !!roomCode;
-
-  // Player state
-  const [localPlayerId] = useState(() => `player_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
-  const [localPlayerName, setLocalPlayerName] = useState(() => localStorage.getItem("profileName") || "");
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [isHost, setIsHost] = useState(!isMultiplayer);
-
-  // Game state
-  const [gamePhase, setGamePhase] = useState<GamePhase>("lobby");
-  const [currentRound, setCurrentRound] = useState(1);
-  const [totalRounds, setTotalRounds] = useState(3);
-  const [timeLeft, setTimeLeft] = useState(ROUND_TIME);
-  const [currentLetter, setCurrentLetter] = useState<string | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [selectedList, setSelectedList] = useState<CategoryList>(CATEGORY_LISTS[0]);
-
-  // Player answers and results
+  const [timer, setTimer] = useState<number>(180);
+  const [timeLeft, setTimeLeft] = useState<number>(180);
+  const [running, setRunning] = useState(false);
+  const [letter, setLetter] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [allResults, setAllResults] = useState<Record<string, PlayerResult>>({});
-  const [votes, setVotes] = useState<Record<string, string[]>>({});
-  const [roundScores, setRoundScores] = useState<Record<string, number[]>>({});
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const roomCode: string | null = ((searchParams.get("room") || "").toUpperCase()) || null;
 
-  // UI state
-  const [showResults, setShowResults] = useState(false);
-  const [showFinalScoreboard, setShowFinalScoreboard] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem("soundEnabled") !== "false");
-  const [codeCopied, setCodeCopied] = useState(false);
-
-  // Chat
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-
-  // Refs
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Hooks
-  const { playRoundStart, playVote, playWin } = useGameSounds(soundEnabled);
-
-  // Room advertising for multiplayer
-  usePublicRoomAdvertiser({
-    enabled: isMultiplayer && isHost,
-    roomCode: roomCode || "",
-    payload: {
-      name: `${localPlayerName || "Anonymous"}'s Room`,
-      hostName: localPlayerName || "Anonymous",
-      maxPlayers: 8,
-      createdAtISO: new Date().toISOString(),
-    },
-    players: players.length,
-    inMatch: gamePhase !== "lobby",
+  const initialName = (typeof window !== 'undefined' ? localStorage.getItem('profileName') : '') || 'Player';
+  const [profileName] = useState<string>(initialName);
+  const [playerId] = useState<string>(() => {
+    const existing = typeof window !== 'undefined' ? localStorage.getItem('playerId') : null;
+    if (existing) return existing;
+    const id = (crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2));
+    if (typeof window !== 'undefined') localStorage.setItem('playerId', id);
+    return id;
   });
+const createdAtRef = useRef<string>(new Date().toISOString());
+const [roomName, setRoomName] = useState<string>(() => `${(profileName || 'Player')}'s Room`);
+const [publicListing, setPublicListing] = useState<boolean>(false);
+const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+const [roomCreator, setRoomCreator] = useState<string | null>(null);
+const [messages, setMessages] = useState<ChatMessage[]>([]);
+const [presentCount, setPresentCount] = useState<number>(1);
+  const [players, setPlayers] = useState<{ id: string; name: string; online_at?: string }[]>([]);
+  const [results, setResults] = useState<Record<string, PlayerResult>>({});
+  const [votes, setVotes] = useState<Record<string, string[]>>({});
+  const [showResults, setShowResults] = useState(false);
 
-  // Initialize player name
+  // Match state (multiplayer)
+  const [roundsPerMatch, setRoundsPerMatch] = useState<number>(5);
+  const [roundsPlayed, setRoundsPlayed] = useState<number>(0);
+  const [currentRoundIndex, setCurrentRoundIndex] = useState<number>(0);
+  const [activeCategories, setActiveCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [usedListIds, setUsedListIds] = useState<Set<string>>(new Set());
+  const [matchTotals, setMatchTotals] = useState<Record<string, number>>({});
+  const [streaks, setStreaks] = useState<Record<string, number>>({});
+  const [leaderId, setLeaderId] = useState<string | null>(null);
+  const [hostId, setHostId] = useState<string | null>(null);
+  const [roundCommitted, setRoundCommitted] = useState<boolean>(false);
+  const isHost = Boolean(roomCode) && hostId === playerId;
+  const [matchSummary, setMatchSummary] = useState<{
+    winners: { id: string; name: string; total: number }[];
+    totals: Record<string, number>;
+    players: { id: string; name: string }[];
+  } | null>(null);
+  const [finalOpen, setFinalOpen] = useState<boolean>(false);
+  const [voteSeconds, setVoteSeconds] = useState<number>(15);
+  const [voteTimeLeft, setVoteTimeLeft] = useState<number>(0);
+  const [votingActive, setVotingActive] = useState<boolean>(false);
+  const [soundOn, setSoundOn] = useState<boolean>(() => {
+    try { return JSON.parse(localStorage.getItem('soundOn') ?? 'true'); } catch { return true; }
+  });
+  useEffect(() => { localStorage.setItem('soundOn', JSON.stringify(soundOn)); }, [soundOn]);
+  const { playRoundStart, playVote, playWin } = useGameSounds(soundOn);
+  const [roundStarting, setRoundStarting] = useState<boolean>(false);
+  const roundStartingRef = useRef<boolean>(false);
+  const submittedRef = useRef<boolean>(false);
+  // Ready-up presence state
+  const [ready, setReady] = useState<boolean>(false);
+  const [readyMap, setReadyMap] = useState<Record<string, boolean>>({});
+  const leaveRoom = () => {
+    navigate("/");
+    toast({ title: "Left room", description: "You returned to the main menu." });
+  };
+  const progress = useMemo(() => {
+    if (!running || timer === 0) return 0;
+    return Math.min(100, ((timer - timeLeft) / timer) * 100);
+  }, [running, timeLeft, timer]);
+
+  const displayRound = useMemo(() => {
+    if (currentRoundIndex > 0) return currentRoundIndex;
+    const base = roundsPlayed;
+    const inProgress = running || showResults || votingActive;
+    const next = base + (inProgress ? 1 : 0);
+    if (next <= 0) return 1;
+    return Math.min(roundsPerMatch, next);
+  }, [currentRoundIndex, roundsPlayed, running, showResults, votingActive, roundsPerMatch]);
+
+  const primaryButtonLabel = useMemo(() => {
+    if (running) return "Round Running";
+    if (roundsPlayed >= roundsPerMatch) return "Start New Match";
+    if (roundsPlayed === 0 && !currentRoundIndex) return roomCode ? "Start Match" : "Start Round";
+    return "Next Round";
+  }, [running, roundsPlayed, roundsPerMatch, currentRoundIndex, roomCode]);
+
+  const allReady = useMemo(() => {
+    if (!roomCode) return true;
+    if (players.length === 0) return false;
+    return players.every((p) => readyMap[p.id]);
+  }, [roomCode, players, readyMap]);
+  const readyCount = useMemo(() => players.filter((p) => readyMap[p.id]).length, [players, readyMap]);
+
+  // Lock settings when a match is in progress (any round started until match ends)
+  const matchInProgress = useMemo(
+    () => running || showResults || votingActive || roundsPlayed > 0 || currentRoundIndex > 0,
+    [running, showResults, votingActive, roundsPlayed, currentRoundIndex]
+  );
+  const matchInProgressRef = useRef(false);
+useEffect(() => {
+  matchInProgressRef.current = matchInProgress;
+}, [matchInProgress]);
+
+// Advertise room in public lobby when enabled (host-only)
+usePublicRoomAdvertiser({
+  enabled: !!roomCode && isHost && publicListing,
+  roomCode: roomCode || "",
+  payload: {
+    name: roomName,
+    hostName: profileName,
+    maxPlayers: 8,
+    createdAtISO: createdAtRef.current,
+  },
+  players: presentCount,
+  inMatch: matchInProgress,
+});
   useEffect(() => {
-    if (!localPlayerName) {
-      const name = prompt("Enter your name:") || "Anonymous";
-      setLocalPlayerName(name);
-      localStorage.setItem("profileName", name);
+    if (!running) return;
+    const id = setInterval(() => {
+      setTimeLeft((t) => {
+        if (t <= 1) {
+          clearInterval(id);
+          setRunning(false);
+          const r: PlayerResult = { playerId, name: profileName, letter, answers } as PlayerResult;
+          setResults((prev) => ({ ...prev, [playerId]: r }));
+          submittedRef.current = true;
+          if (roomCode && channelRef.current) {
+            channelRef.current.send({ type: "broadcast", event: "round_submit", payload: r });
+            if (isHost) {
+              channelRef.current.send({ type: "broadcast", event: "round_end", payload: {} });
+            }
+          }
+          if (!roomCode || isHost) {
+            setShowResults(true);
+            setVotingActive(true);
+          }
+          toast({ title: "Time's up!", description: "Review and submit your answers." });
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [running, roomCode, playerId, profileName, letter, answers, isHost]);
+
+  useEffect(() => {
+    if (!roomCode) return;
+    
+    // Set this player as room creator if they're first to join
+    if (!roomCreator) {
+      setRoomCreator(playerId);
+      setHostId(playerId); // Make room creator the initial host
     }
-  }, [localPlayerName]);
-
-  // Multiplayer setup
-  useEffect(() => {
-    if (!isMultiplayer || !roomCode || !localPlayerName) return;
-
-    const channel = supabase.channel(roomCode);
+    
+    const channel = supabase.channel(`room_${roomCode}`, { config: { presence: { key: playerId } } });
     channelRef.current = channel;
 
     channel
-      .on("presence", { event: "sync" }, () => {
-        const state = channel.presenceState();
-        const playerList = Object.entries(state).map(([id, presences]) => {
-          const p = presences[0] as any;
-          return { id, name: p.name, isHost: p.isHost };
-        });
-        setPlayers(playerList);
-
-        // Determine if current player is host
-        const currentPlayer = playerList.find(p => p.id === localPlayerId);
-        setIsHost(currentPlayer?.isHost || playerList.length === 1);
-      })
-      .on("broadcast", { event: "game_state" }, ({ payload }) => {
-        const { phase, round, timeLeft: time, letter, categories: cats, totalRounds: total } = payload;
-        setGamePhase(phase);
-        setCurrentRound(round);
-        setTimeLeft(time);
-        setCurrentLetter(letter);
-        setCategories(cats);
-        setTotalRounds(total);
-        if (phase === "playing") playRoundStart();
-      })
-      .on("broadcast", { event: "results" }, ({ payload }) => {
-        setAllResults(payload.results);
-        setShowResults(true);
-      })
-      .on("broadcast", { event: "vote" }, ({ payload }) => {
-        setVotes(prev => ({
-          ...prev,
-          [payload.key]: payload.voters,
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState() as Record<string, { id: string; name: string; online_at?: string; ready?: boolean }[]>;
+        const list = Object.entries(state).map(([key, presences]) => ({
+          id: key,
+          name: presences?.[0]?.name || 'Player',
+          online_at: presences?.[0]?.online_at,
+          ready: !!presences?.[0]?.ready,
         }));
-      })
-      .on("broadcast", { event: "final_scores" }, ({ payload }) => {
-        setRoundScores(payload.scores);
-        setShowFinalScoreboard(true);
-      })
-      .on("broadcast", { event: "chat" }, ({ payload }) => {
-        setChatMessages(prev => [...prev, payload]);
-      })
-      .on("broadcast", { event: "player_answers" }, ({ payload }) => {
-        setAllResults(prev => ({
-          ...prev,
-          [payload.playerId]: payload.result,
-        }));
-      })
-      .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          await channel.track({
-            name: localPlayerName,
-            isHost: players.length === 0,
-          });
-        }
-      });
-
-    return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-      }
-    };
-  }, [isMultiplayer, roomCode, localPlayerName, localPlayerId, players.length, playRoundStart]);
-
-  // Timer logic
-  useEffect(() => {
-    if (gamePhase === "playing" || gamePhase === "voting") {
-      timerRef.current = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            if (gamePhase === "playing") {
-              handleRoundEnd();
-            } else if (gamePhase === "voting") {
-              handleVotingEnd();
+        setPlayers(list.map(({ id, name, online_at }) => ({ id, name, online_at })));
+        setReadyMap(Object.fromEntries(list.map(p => [p.id, !!p.ready])));
+        setPresentCount(list.length || 1);
+        
+        // Host assignment: prioritize room creator, then first person to join
+        if (list.length > 0) {
+          const currentHost = hostId;
+          const currentHostStillPresent = list.some(p => p.id === currentHost);
+          
+          if (!currentHost || !currentHostStillPresent) {
+            // If we know who created the room and they're present, make them host
+            if (roomCreator && list.some(p => p.id === roomCreator)) {
+              setHostId(roomCreator);
+            } else {
+              // Otherwise assign to the person with earliest timestamp
+              const withTs = list.map((p) => ({ ...p, ts: Date.parse(p.online_at || '') || Date.now() }));
+              withTs.sort((a, b) => a.ts - b.ts);
+              setHostId(withTs[0]?.id ?? null);
             }
-            return 0;
           }
-          return prev - 1;
+        }
+      })
+      .on('broadcast', { event: 'chat' }, ({ payload }) => {
+        setMessages((m) => [...m, payload as ChatMessage].slice(-200));
+      })
+      .on('broadcast', { event: 'round_start' }, ({ payload }) => {
+        const p = payload as { letter: string; timer: number; categories: string[]; roundIndex: number };
+        setLetter(p.letter);
+        setAnswers({});
+        setActiveCategories(p.categories);
+        setTimeLeft(p.timer);
+        setRunning(true);
+        setResults({});
+        setVotes({});
+        setShowResults(false);
+        setRoundCommitted(false);
+        submittedRef.current = false;
+        setCurrentRoundIndex(p.roundIndex);
+        // Reset ready on round start
+        setReady(false);
+        try { channelRef.current?.track({ id: playerId, name: profileName, online_at: new Date().toISOString(), ready: false }); } catch {}
+        /* round index received: p.roundIndex; keep roundsPlayed as completed rounds */
+        toast({ title: "Round started", description: `Letter: ${p.letter} • ${p.timer} seconds` });
+        playRoundStart();
+        setRoundStarting(false);
+        roundStartingRef.current = false;
+      })
+      .on('broadcast', { event: 'round_submit' }, ({ payload }) => {
+        const r = payload as PlayerResult;
+        setResults((prev) => ({ ...prev, [r.playerId]: r }));
+      })
+      .on('broadcast', { event: 'round_end' }, () => {
+        if (!isHost) {
+          toast({ title: "Host ended the round early", description: "Your answers were auto-submitted. Cast your votes." });
+        }
+        if (!submittedRef.current) {
+          const r: PlayerResult = { playerId, name: profileName, letter, answers } as PlayerResult;
+          setResults((prev) => ({ ...prev, [playerId]: r }));
+          channelRef.current?.send({ type: 'broadcast', event: 'round_submit', payload: r });
+          submittedRef.current = true;
+        }
+        setRunning(false);
+        setShowResults(true);
+        setVotingActive(true);
+        // Ensure all present players appear in results (empty answers if none submitted)
+        setResults((prev) => {
+          const next = { ...prev } as Record<string, PlayerResult>;
+          try {
+            for (const p of players) {
+              if (!next[p.id]) next[p.id] = { playerId: p.id, name: p.name, letter, answers: {} } as PlayerResult;
+            }
+          } catch {}
+          return next;
         });
-      }, 1000);
-    } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
+      })
+      .on('broadcast', { event: 'vote' }, ({ payload }) => {
+        const { key, voterId } = payload as { key: string; voterId: string };
+        setVotes((prev) => {
+          const set = new Set([...(prev[key] || [])]);
+          set.add(voterId);
+          return { ...prev, [key]: Array.from(set) };
+        });
+      })
+      .on('broadcast', { event: 'vote_extend' }, ({ payload }) => {
+        const { add } = payload as { add: number };
+        setVoteTimeLeft((t) => t + (add || 0));
+      })
+      .on('broadcast', { event: 'room_settings' }, ({ payload }) => {
+        // Ignore mid-match setting changes
+        if (matchInProgressRef.current) return;
+        const p = payload as { timer: number; roundsPerMatch: number; voteSeconds?: number };
+        setTimer(p.timer);
+        setRoundsPerMatch(p.roundsPerMatch);
+        if (typeof p.voteSeconds === 'number') setVoteSeconds(p.voteSeconds);
+        toast({ title: "Room settings updated", description: `Timer ${p.timer}s • Rounds ${p.roundsPerMatch}${typeof p.voteSeconds === 'number' ? ` • Voting ${p.voteSeconds}s` : ''}` });
+      })
+      .on('broadcast', { event: 'scores_state' }, ({ payload }) => {
+        const p = payload as { matchTotals: Record<string, number>; streaks: Record<string, number>; roundsPlayed: number; leaderId: string | null };
+        setMatchTotals(p.matchTotals);
+        setStreaks(p.streaks);
+        setRoundsPlayed(p.roundsPlayed);
+        setLeaderId(p.leaderId ?? null);
+      })
+      .on('broadcast', { event: 'match_end' }, ({ payload }) => {
+        const p = payload as { 
+          winners: { id: string; name: string; total: number }[]; 
+          matchId?: string; 
+          totals?: Record<string, number>; 
+          players?: { id: string; name: string }[] 
+        };
+        // Update local leaderboard (legacy local storage)
+        try {
+          const raw = localStorage.getItem('leaderboard');
+          const existing = raw ? (JSON.parse(raw) as { name: string; wins: number }[]) : [];
+          const map = new Map(existing.map((e) => [e.name, e.wins] as const));
+          for (const w of p.winners) {
+            map.set(w.name, (map.get(w.name) ?? 0) + 1);
+          }
+          const updated = Array.from(map.entries()).map(([name, wins]) => ({ name, wins }));
+          localStorage.setItem('leaderboard', JSON.stringify(updated));
+        } catch (_) {}
+        toast({ title: "Match over!", description: `Winner(s): ${p.winners.map((w) => w.name).join(', ')}` });
+
+        // Persist to Supabase if signed in
+        (async () => {
+          const { data: sess } = await supabase.auth.getSession();
+          const user = sess.session?.user;
+          if (!user) return;
+          const meWon = p.winners.some((w) => w.id === playerId);
+          // Ensure profile exists and update streaks
+          const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+          const display_name = prof?.display_name || profileName || user.email || 'Player';
+          const current_streak = meWon ? (prof?.current_streak ?? 0) + 1 : 0;
+          const best_streak = Math.max(prof?.best_streak ?? 0, current_streak);
+          await supabase.from('profiles').upsert({ id: user.id, display_name, current_streak, best_streak }).select();
+          // Record a match win if this client won and we have a matchId
+          if (meWon && p.matchId) {
+            await supabase.from('match_wins').insert({ match_id: p.matchId, user_id: user.id }).select();
+          }
+        })();
+
+        // Show final scoreboard to all players using the data from the broadcast
+        if (!isHost) {
+          // Use the broadcast totals and players if available, otherwise fall back to local data
+          const broadcastTotals = p.totals || {};
+          const broadcastPlayers = p.players || players.map((pl) => ({ id: pl.id, name: pl.name }));
+          const totals: Record<string, number> = { ...broadcastTotals };
+          
+          // Ensure all players have a score entry
+          for (const pl of broadcastPlayers) { 
+            if (totals[pl.id] === undefined) totals[pl.id] = 0; 
+          }
+          
+          setMatchSummary({ winners: p.winners, totals, players: broadcastPlayers });
+          setFinalOpen(true);
+        }
+        // Reset match state
+        setMatchTotals({});
+        setStreaks({});
+        setRoundsPlayed(0);
+        setLeaderId(null);
+        setUsedListIds(new Set());
+        setCurrentRoundIndex(0);
+      });
+
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await channel.track({ id: playerId, name: profileName, online_at: new Date().toISOString(), ready });
       }
-    }
+    });
 
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
+      supabase.removeChannel(channel);
+      channelRef.current = null;
     };
-  }, [gamePhase]);
+  }, [roomCode, playerId, profileName]);
 
-  // Game logic functions
-  const startGame = useCallback(() => {
-    const letter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
-    const gameState = {
-      phase: "playing" as GamePhase,
-      round: 1,
-      timeLeft: ROUND_TIME,
-      letter,
-      categories: selectedList.categories,
-      totalRounds,
-    };
-
-    setGamePhase("playing");
-    setCurrentRound(1);
-    setTimeLeft(ROUND_TIME);
-    setCurrentLetter(letter);
-    setCategories(selectedList.categories);
-    setAnswers({});
-    setAllResults({});
-    setVotes({});
-    setRoundScores({});
-
-    if (isMultiplayer && channelRef.current) {
-      channelRef.current.send({
-        type: "broadcast",
-        event: "game_state",
-        payload: gameState,
-      });
-    }
-
-    playRoundStart();
-  }, [selectedList, totalRounds, isMultiplayer, playRoundStart]);
-
-  const handleRoundEnd = useCallback(() => {
-    const result: PlayerResult = {
-      playerId: localPlayerId,
-      name: localPlayerName,
-      letter: currentLetter,
-      answers,
-    };
-
-    setAllResults(prev => ({ ...prev, [localPlayerId]: result }));
-    setGamePhase("voting");
-    setTimeLeft(VOTE_TIME);
-
-    if (isMultiplayer && channelRef.current) {
-      channelRef.current.send({
-        type: "broadcast",
-        event: "player_answers",
-        payload: { playerId: localPlayerId, result },
-      });
-    }
-
-    setTimeout(() => setShowResults(true), 500);
-  }, [localPlayerId, localPlayerName, currentLetter, answers, isMultiplayer]);
-
-  const handleVotingEnd = useCallback(() => {
-    // Calculate scores and determine if game should continue
-    const newScores = { ...roundScores };
-    Object.keys(allResults).forEach(playerId => {
-      if (!newScores[playerId]) newScores[playerId] = [];
-      // Score calculation logic would go here
-      newScores[playerId][currentRound - 1] = Math.floor(Math.random() * 10); // Placeholder
-    });
-
-    setRoundScores(newScores);
-    setShowResults(false);
-
-    if (currentRound >= totalRounds) {
-      setGamePhase("final");
-      setShowFinalScoreboard(true);
-      playWin();
-    } else {
-      // Start next round
-      const nextRound = currentRound + 1;
-      const letter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
-      
-      setCurrentRound(nextRound);
-      setCurrentLetter(letter);
-      setGamePhase("playing");
-      setTimeLeft(ROUND_TIME);
-      setAnswers({});
-      setAllResults({});
-      setVotes({});
-
-      if (isMultiplayer && channelRef.current) {
-        channelRef.current.send({
-          type: "broadcast",
-          event: "game_state",
-          payload: {
-            phase: "playing",
-            round: nextRound,
-            timeLeft: ROUND_TIME,
-            letter,
-            categories,
-            totalRounds,
-          },
-        });
-      }
-
-      playRoundStart();
-    }
-  }, [roundScores, allResults, currentRound, totalRounds, categories, isMultiplayer, playWin, playRoundStart]);
-
-  const handleVote = useCallback((voteKey: string) => {
-    const currentVoters = votes[voteKey] || [];
-    const hasVoted = currentVoters.includes(localPlayerId);
-    const newVoters = hasVoted 
-      ? currentVoters.filter(id => id !== localPlayerId)
-      : [...currentVoters, localPlayerId];
-
-    setVotes(prev => ({ ...prev, [voteKey]: newVoters }));
-
-    if (isMultiplayer && channelRef.current) {
-      channelRef.current.send({
-        type: "broadcast",
-        event: "vote",
-        payload: { key: voteKey, voters: newVoters },
-      });
-    }
-
-    playVote();
-  }, [votes, localPlayerId, isMultiplayer, playVote]);
-
-  const sendChatMessage = useCallback((text: string) => {
-    const message: ChatMessage = {
-      id: localPlayerId,
-      name: localPlayerName,
-      text,
-      ts: Date.now(),
-    };
-
-    setChatMessages(prev => [...prev, message]);
-
-    if (isMultiplayer && channelRef.current) {
-      channelRef.current.send({
-        type: "broadcast",
-        event: "chat",
-        payload: message,
-      });
-    }
-  }, [localPlayerId, localPlayerName, isMultiplayer]);
-
-  const copyRoomCode = useCallback(() => {
-    if (roomCode) {
-      navigator.clipboard.writeText(roomCode);
-      setCodeCopied(true);
-      setTimeout(() => setCodeCopied(false), 2000);
-      toast({ title: "Room code copied!", description: `Share ${roomCode} with friends` });
-    }
-  }, [roomCode]);
-
-  // Computed values
-  const progress = useMemo(() => {
-    const maxTime = gamePhase === "voting" ? VOTE_TIME : ROUND_TIME;
-    return ((maxTime - timeLeft) / maxTime) * 100;
-  }, [gamePhase, timeLeft]);
-
-  const finalSummary = useMemo((): FinalSummary | null => {
-    if (!showFinalScoreboard) return null;
-    
-    const totals: Record<string, number> = {};
-    Object.entries(roundScores).forEach(([playerId, scores]) => {
-      totals[playerId] = scores.reduce((sum, score) => sum + score, 0);
-    });
-
-    const maxScore = Math.max(...Object.values(totals));
-    const winners = Object.entries(totals)
-      .filter(([, score]) => score === maxScore)
-      .map(([id]) => ({
-        id,
-        name: players.find(p => p.id === id)?.name || "Player",
-        total: maxScore,
-      }));
-
-    return { totals, winners, players };
-  }, [showFinalScoreboard, roundScores, players]);
-
-  const streaks = useMemo(() => {
-    // Calculate win streaks for chat display
-    const streakMap: Record<string, number> = {};
-    // This would be calculated based on game history
-    return streakMap;
-  }, []);
-
-  // Solo game setup
+  // Host: broadcast current settings/scores when becoming host or on subscribe
   useEffect(() => {
-    if (!isMultiplayer) {
-      setPlayers([{ id: localPlayerId, name: localPlayerName, isHost: true }]);
+    if (!roomCode || !channelRef.current || !isHost) return;
+    channelRef.current.send({ type: 'broadcast', event: 'room_settings', payload: { timer, roundsPerMatch, voteSeconds } });
+    channelRef.current.send({ type: 'broadcast', event: 'scores_state', payload: { matchTotals, streaks, roundsPlayed, leaderId } });
+  }, [roomCode, isHost]);
+
+  // Update presence when ready toggles
+  useEffect(() => {
+    if (!roomCode || !channelRef.current) return;
+    try { channelRef.current.track({ id: playerId, name: profileName, online_at: new Date().toISOString(), ready }); } catch {}
+  }, [ready, roomCode, playerId, profileName]);
+
+  // Compute majority threshold for disqualification
+  const majority = useMemo(() => Math.floor(presentCount / 2) + 1, [presentCount]);
+
+  // Host-only: commit round scores based on current results and votes
+  const commitRoundScores = (autoAdvance = false) => {
+    if (!roomCode || !isHost) return;
+    if (roundCommitted) return;
+
+    // Build duplicate maps per category index (only for valid starting-letter answers)
+    const targetLetterUpper = (letter || '').toUpperCase();
+    const countsByIdx: Record<number, Record<string, number>> = {};
+    for (const r of Object.values(results)) {
+      const ltr = (r.letter || targetLetterUpper).toUpperCase();
+      for (const [idxStr, ans] of Object.entries(r.answers || {})) {
+        const idx = Number(idxStr);
+        if (!ans) continue;
+        const startsOk = ltr && ans.trimStart().charAt(0).toUpperCase() === ltr;
+        if (!startsOk) continue;
+        const norm = normalizeAnswer(ans);
+        countsByIdx[idx] = countsByIdx[idx] || {};
+        countsByIdx[idx][norm] = (countsByIdx[idx][norm] || 0) + 1;
+      }
     }
-  }, [isMultiplayer, localPlayerId, localPlayerName]);
+
+    // Tally round scores
+    const newTotals = { ...matchTotals };
+    const nextStreaks: Record<string, number> = { ...streaks };
+    const perPlayerRoundScore: Record<string, number> = {};
+    for (const r of Object.values(results)) {
+      let score = 0;
+      const ltr = (r.letter || letter || '').toUpperCase();
+      for (const [idxStr, ans] of Object.entries(r.answers || {})) {
+        const idx = Number(idxStr);
+        const key = `${r.playerId}:${idx}`;
+        const dq = (votes[key]?.length || 0) >= majority;
+        const val = ans || '';
+        const startsOk = !!val && ltr && val.trimStart().charAt(0).toUpperCase() === ltr;
+        if (dq && !!val.trim()) { score -= 1; continue; }
+        if (!startsOk) continue;
+        const norm = normalizeAnswer(val);
+        const dup = (countsByIdx[idx]?.[norm] || 0) > 1;
+        if (!dup) {
+          score += 1;
+          if (isAlliteration(val, ltr)) score += 1;
+        }
+      }
+      perPlayerRoundScore[r.playerId] = score;
+      newTotals[r.playerId] = (newTotals[r.playerId] ?? 0) + score;
+    }
+    // Determine round winners (for UI only); do NOT update streaks here (streaks are per MATCH)
+    const maxScore = Math.max(0, ...Object.values(perPlayerRoundScore));
+    const winners = Object.entries(perPlayerRoundScore)
+      .filter(([, s]) => s === maxScore)
+      .map(([id]) => id);
+
+    // Keep streaks unchanged during rounds
+    // Compute leader by totals (tie => null)
+    let nextLeader: string | null = null;
+    let maxTotal = -1;
+    let tie = false;
+    for (const [id, tot] of Object.entries(newTotals)) {
+      if (tot > maxTotal) { maxTotal = tot; nextLeader = id; tie = false; }
+      else if (tot === maxTotal) { tie = true; }
+    }
+    if (tie) nextLeader = null;
+
+    // Compute next round index based on current state
+    const nextRound = roundsPlayed + 1;
+
+    setMatchTotals(newTotals);
+    setStreaks(nextStreaks);
+    setRoundsPlayed(nextRound);
+    setLeaderId(nextLeader);
+    setRoundCommitted(true);
+
+    // Broadcast state
+    channelRef.current?.send({ type: 'broadcast', event: 'scores_state', payload: {
+      matchTotals: newTotals,
+      streaks: nextStreaks,
+      roundsPlayed: nextRound,
+      leaderId: nextLeader,
+    }});
+
+    // Auto end match if done
+    const done = nextRound >= roundsPerMatch;
+    if (done) endMatch(newTotals);
+  };
+
+  const endMatch = (totalsArg?: Record<string, number>) => {
+    if (!roomCode || !isHost) return;
+    const currentPlayers = players.map((p) => ({ id: p.id, name: p.name }));
+    const totalsRaw = totalsArg ?? matchTotals;
+    // Ensure all players are present in totals
+    const totals: Record<string, number> = { ...totalsRaw };
+    for (const p of currentPlayers) { if (totals[p.id] === undefined) totals[p.id] = 0; }
+
+    const maxTotal = Math.max(0, ...Object.values(totals));
+    const winners = Object.entries(totals).filter(([, t]) => t === maxTotal).map(([id]) => {
+      const name = players.find((p) => p.id === id)?.name || 'Player';
+      return { id, name, total: maxTotal };
+    });
+
+    // Update streaks at MATCH end (not per round)
+    const newStreaks: Record<string, number> = { ...streaks };
+    const winnerIds = new Set(winners.map((w) => w.id));
+    for (const p of currentPlayers) {
+      if (winnerIds.has(p.id)) newStreaks[p.id] = (newStreaks[p.id] ?? 0) + 1; else newStreaks[p.id] = 0;
+    }
+
+    // Create a match id for persistence
+    const matchId = (crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)) as string;
+
+    // Open final scoreboard locally
+    setMatchSummary({ winners, totals, players: currentPlayers });
+    setFinalOpen(true);
+    playWin();
+
+    // Broadcast to room (include match id and totals for other players to display scoreboard)
+    channelRef.current?.send({ type: 'broadcast', event: 'match_end', payload: { winners, matchId, totals, players: currentPlayers } });
+    channelRef.current?.send({ type: 'broadcast', event: 'scores_state', payload: {
+      matchTotals: totals,
+      streaks: newStreaks,
+      roundsPlayed: 0,
+      leaderId: null,
+    }});
+
+    // Update local state for next match (keep totals for scoreboard until reset)
+    setStreaks(newStreaks);
+    setRoundsPlayed(0);
+    setLeaderId(null);
+  };
+
+  const selectNextList = (): { id: string; categories: string[] } | null => {
+    const available = CATEGORY_LISTS.filter((l) => !usedListIds.has(l.id));
+    if (available.length === 0) {
+      const rand = generateRandomList();
+      return { id: rand.id, categories: rand.categories };
+    }
+    const pick = available[Math.floor(Math.random() * available.length)];
+    return { id: pick.id, categories: pick.categories };
+  };
+
+  const startRound = () => {
+    if (roomCode && !isHost) {
+      toast({ title: "Host only", description: "Only the host can start a round." });
+      return;
+    }
+
+    if (roundStartingRef.current) return;
+    roundStartingRef.current = true;
+    setRoundStarting(true);
+
+    const willCommit = !!roomCode && showResults && !roundCommitted;
+    if (willCommit) {
+      commitRoundScores();
+    }
+
+    let effectiveRoundsPlayed = roundsPlayed + (willCommit ? 1 : 0);
+
+      if (roomCode) {
+        if (effectiveRoundsPlayed >= roundsPerMatch) {
+          // Do not auto-start a new match; show final results instead
+          toast({ title: "Match finished", description: "View the final scoreboard. Start a new match from there." });
+          roundStartingRef.current = false;
+          setRoundStarting(false);
+          return;
+        }
+      }
+
+
+    // Pick categories for this round
+    let categories = activeCategories;
+    let listId: string | null = null;
+    if (roomCode) {
+      const next = selectNextList();
+      if (!next) {
+        toast({ title: "No lists left", description: "All lists used this match." });
+        roundStartingRef.current = false;
+        setRoundStarting(false);
+        return;
+      }
+      categories = next.categories;
+      listId = next.id;
+      setActiveCategories(categories);
+      setUsedListIds((prev) => new Set(prev).add(next.id));
+    }
+
+    const l = randomLetter();
+    setLetter(l);
+    setAnswers({});
+    setTimeLeft(timer);
+    setRunning(true);
+    setResults({});
+    setVotes({});
+    setShowResults(false);
+    setVotingActive(false);
+    setRoundCommitted(false);
+    const roundIndex = effectiveRoundsPlayed + 1;
+    setCurrentRoundIndex(roundIndex);
+    toast({ title: "Round started", description: `Letter: ${l} • ${timer} seconds` });
+    if (roomCode && channelRef.current) {
+      channelRef.current.send({ type: 'broadcast', event: 'round_start', payload: { letter: l, timer, categories, roundIndex } });
+    }
+
+    // Safety: release debounce if we don't get our own broadcast echo
+    setTimeout(() => { roundStartingRef.current = false; setRoundStarting(false); }, 500);
+  };
+
+  const submitRound = () => {
+    setRunning(false);
+    const r: PlayerResult = { playerId, name: profileName, letter, answers } as PlayerResult;
+    setResults((prev) => ({ ...prev, [playerId]: r }));
+    submittedRef.current = true;
+    if (roomCode && channelRef.current) {
+      channelRef.current.send({ type: 'broadcast', event: 'round_submit', payload: r });
+      if (isHost) {
+        channelRef.current.send({ type: 'broadcast', event: 'round_end', payload: {} });
+      }
+    }
+    if (!roomCode || isHost) { setShowResults(true); setVotingActive(true); }
+    const totalFilled = Object.values(answers as Record<number, string>).filter((a) => a && a.trim().length > 0).length;
+    const totalCats = activeCategories.length;
+    toast({ title: "Round submitted", description: `You filled ${totalFilled}/${totalCats} categories.` });
+  };
+
+  const endRoundEarly = () => {
+    if (!roomCode || !isHost || !channelRef.current) return;
+    setRunning(false);
+    const r: PlayerResult = { playerId, name: profileName, letter, answers } as PlayerResult;
+    setResults((prev) => ({ ...prev, [playerId]: r }));
+    submittedRef.current = true;
+    channelRef.current.send({ type: 'broadcast', event: 'round_submit', payload: r });
+    channelRef.current.send({ type: 'broadcast', event: 'round_end', payload: {} });
+    setShowResults(true);
+    setVotingActive(true);
+  };
+  useEffect(() => {
+    if (!votingActive) { setVoteTimeLeft(0); return; }
+    setVoteTimeLeft(voteSeconds);
+    const id = setInterval(() => {
+      setVoteTimeLeft((t) => {
+        if (t <= 1) {
+          clearInterval(id);
+          if (isHost) {
+            if (!roundCommitted) commitRoundScores(true);
+            setShowResults(false);
+            setVotingActive(false);
+            const nextRoundNum = roundsPlayed + 1;
+            if (roomCode && nextRoundNum < roundsPerMatch) {
+              setTimeout(() => startRound(), 250);
+            }
+          } else {
+            setVotingActive(false);
+          }
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [votingActive, voteSeconds, isHost, roundsPlayed, roundsPerMatch, roomCode]);
 
   return (
     <>
       <Helmet>
-        <title>
-          {isMultiplayer ? `Room ${roomCode} — Scattergories` : "Solo Game — Scattergories"}
-        </title>
-        <meta name="description" content="Play Scattergories with friends in real-time!" />
+        <title>Scattergories Online — Solo Round</title>
+        <meta name="description" content="Play Scattergories online in solo mode. Random letters, timed rounds, and 12 classic categories. Start a quick round now!" />
+        <link rel="canonical" href="/game" />
       </Helmet>
-
-      <div className="relative min-h-screen card-game-bg">
+      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-primary/10 via-accent/10 to-background">
         <Aurora />
         <Particles />
-        
-        <div className="relative z-10 container mx-auto px-4 py-6">
-          <div className="max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="glass-panel rounded-2xl p-6 mb-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate("/")}
-                    className="glass-card hover:scale-105"
-                  >
-                    <Home className="w-4 h-4 mr-2" />
-                    Home
-                  </Button>
-                  
-                  {isMultiplayer && roomCode && (
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="font-mono text-lg px-3 py-1">
-                        {roomCode}
-                      </Badge>
+        <main className="relative z-10 container mx-auto py-8">
+          <div className="rounded-xl border border-border/60 bg-background/60 backdrop-blur-xl p-4 md:p-6 shadow-[var(--shadow-elegant)]">
+            <header className="mb-4 sm:mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-lg p-3 sm:p-4 bg-gradient-to-r from-primary/10 to-transparent animate-fade-in">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Scattergories Online — {roomCode ? "Room" : "Solo"}</h1>
+                <p className="text-muted-foreground mt-1 text-sm sm:text-base">12 categories • one letter • beat the clock</p>
+              </div>
+              {roomCode && (
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="hidden md:flex -space-x-2">
+                    {players.map((p) => (
+                      <Avatar key={p.id} className="border shadow">
+                        <AvatarFallback style={{ backgroundImage: gradientFromString(p.name), color: "white" }}>
+                          {initialsFromName(p.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    ))}
+                  </div>
+                  <span className="rounded-full border px-2 py-0.5 text-xs sm:text-sm sm:px-3 sm:py-1">Room {roomCode} • {presentCount} online</span>
+
+                  <Button variant="outline" size="sm" className="hover-scale" onClick={() => {
+                      const shareUrl = `${window.location.origin}/game?room=${roomCode}`;
+                      navigator.clipboard?.writeText(shareUrl);
+                      toast({ title: "Room link copied", description: shareUrl });
+                    }}>
+                      <Share2 className="h-4 w-4 mr-2" /> Share
+                    </Button>
+
+                    <span className="hidden sm:inline rounded-full border px-2 py-0.5 text-xs sm:text-sm">Ready {readyCount}/{presentCount}</span>
+
+                    <Button
+                      variant={ready ? "secondary" : "outline"}
+                      size="sm"
+                      className="hover-scale"
+                      onClick={() => {
+                        const next = !ready;
+                        setReady(next);
+                        try { channelRef.current?.track({ id: playerId, name: profileName, online_at: new Date().toISOString(), ready: next }); } catch {}
+                      }}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" /> {ready ? "Ready" : "Ready up"}
+                    </Button>
+
+                    <Dialog>
+                    <DialogTrigger asChild>
                       <Button
                         variant="ghost"
-                        size="sm"
-                        onClick={copyRoomCode}
-                        className="glass-card hover:scale-105"
+                        size="icon"
+                        aria-label="Room settings"
+                        className="hover-scale"
+                        disabled={matchInProgress}
+                        title={matchInProgress ? "Settings are locked during a match" : undefined}
                       >
-                        {codeCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        <Settings className="h-5 w-5" />
                       </Button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSoundEnabled(!soundEnabled);
-                      localStorage.setItem("soundEnabled", (!soundEnabled).toString());
-                    }}
-                    className="glass-card hover:scale-105"
-                  >
-                    {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                  </Button>
-                  
-                  <div className="flex items-center gap-2 text-sm">
-                    <Users className="w-4 h-4" />
-                    <span>{players.length} player{players.length !== 1 ? 's' : ''}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Game Content */}
-            <div className="grid gap-6 lg:grid-cols-4">
-              {/* Main Game Area */}
-              <div className="lg:col-span-3 space-y-6">
-                {gamePhase === "lobby" && (
-                  <Card className="glass-panel">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Settings className="w-5 h-5" />
-                        Game Setup
-                      </CardTitle>
-                      <CardDescription>
-                        Configure your game settings before starting
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">Category List</label>
-                          <div className="grid gap-2">
-                            {CATEGORY_LISTS.slice(0, 3).map((list) => (
-                              <Button
-                                key={list.id}
-                                variant={selectedList.id === list.id ? "default" : "outline"}
-                                onClick={() => setSelectedList(list)}
-                                className="justify-start glass-card hover:scale-105"
-                              >
-                                <List className="w-4 h-4 mr-2" />
-                                {list.name}
-                              </Button>
-                            ))}
-                            <Button
-                              variant={selectedList.id.startsWith("rand") ? "default" : "outline"}
-                              onClick={() => setSelectedList(generateRandomList())}
-                              className="justify-start glass-card hover:scale-105"
-                            >
-                              <Shuffle className="w-4 h-4 mr-2" />
-                              Random Mix
-                            </Button>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">Number of Rounds</label>
-                          <div className="grid grid-cols-3 gap-2">
-                            {[1, 3, 5].map((rounds) => (
-                              <Button
-                                key={rounds}
-                                variant={totalRounds === rounds ? "default" : "outline"}
-                                onClick={() => setTotalRounds(rounds)}
-                                className="glass-card hover:scale-105"
-                              >
-                                {rounds}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h3 className="font-medium mb-3">Categories Preview</h3>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          {selectedList.categories.map((category, index) => (
-                            <div key={index} className="text-sm p-2 rounded glass-card">
-                              {index + 1}. {category}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {(!isMultiplayer || isHost) && (
-                        <Button
-                          onClick={startGame}
-                          size="lg"
-                          className="w-full glass-card hover:scale-105"
-                          disabled={players.length === 0}
-                        >
-                          <Play className="w-5 h-5 mr-2" />
-                          Start Game
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-
-                {(gamePhase === "playing" || gamePhase === "voting") && (
-                  <Card className="glass-panel">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="flex items-center gap-2">
-                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold shadow-lg">
-                              {currentLetter}
-                            </div>
-                            Round {currentRound} of {totalRounds}
-                          </CardTitle>
-                          <CardDescription>
-                            {gamePhase === "playing" 
-                              ? "Fill in answers that start with the letter above"
-                              : "Vote on questionable answers"
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Room Settings</DialogTitle>
+                        <DialogDescription>Host-only. Applies to everyone instantly.</DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4">
+                        <div className="grid gap-2">
+                          <Label>Timer</Label>
+                          <Select value={String(timer)} onValueChange={(v) => {
+                            const val = parseInt(v, 10);
+                            if (matchInProgress) {
+                              toast({ title: "Settings locked", description: "Cannot change during a match." });
+                              return;
                             }
-                          </CardDescription>
+                            setTimer(val);
+                            if (roomCode && isHost) channelRef.current?.send({ type: 'broadcast', event: 'room_settings', payload: { timer: val, roundsPerMatch, voteSeconds } });
+                          }} disabled={!!roomCode && (!isHost || matchInProgress)}>
+
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select duration" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                <SelectLabel>Duration</SelectLabel>
+                                <SelectItem value="60">60 seconds</SelectItem>
+                                <SelectItem value="120">120 seconds</SelectItem>
+                                <SelectItem value="180">180 seconds</SelectItem>
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
                         </div>
-                        
-                        <div className="text-right">
-                          <div className="flex items-center gap-2 text-2xl font-bold">
-                            <Clock className="w-6 h-6" />
-                            {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-                          </div>
-                          <Progress value={progress} className="w-32 mt-2" />
+                        <div className="grid gap-2">
+                          <Label>Rounds per match</Label>
+                          <Select value={String(roundsPerMatch)} onValueChange={(v) => {
+                            const val = parseInt(v, 10);
+                            if (matchInProgress) {
+                              toast({ title: "Settings locked", description: "Cannot change during a match." });
+                              return;
+                            }
+                            setRoundsPerMatch(val);
+                            if (roomCode && isHost) channelRef.current?.send({ type: 'broadcast', event: 'room_settings', payload: { timer, roundsPerMatch: val, voteSeconds } });
+                          }} disabled={!!roomCode && (!isHost || matchInProgress)}>
+
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select rounds" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                <SelectLabel>Rounds</SelectLabel>
+                                {[3,5,7,9,10].map((n) => (
+                                  <SelectItem key={n} value={String(n)}>{n} rounds</SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
                         </div>
-                      </div>
-                    </CardHeader>
-                    
-                    {gamePhase === "playing" && (
-                      <CardContent>
-                        <div className="grid gap-4">
-                          {categories.map((category, index) => (
-                            <div key={index} className="glass-card p-4 rounded-lg">
-                              <label className="block text-sm font-medium mb-2">
-                                {index + 1}. {category}
-                              </label>
+                        <div className="grid gap-2">
+                          <Label>Voting window</Label>
+                          <Select value={String(voteSeconds)} onValueChange={(v) => {
+                            const val = parseInt(v, 10);
+                            if (matchInProgress) {
+                              toast({ title: "Settings locked", description: "Cannot change during a match." });
+                              return;
+                            }
+                            setVoteSeconds(val);
+                            if (roomCode && isHost) channelRef.current?.send({ type: 'broadcast', event: 'room_settings', payload: { timer, roundsPerMatch, voteSeconds: val } });
+                          }} disabled={!!roomCode && (!isHost || matchInProgress)}>
+
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select voting time" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                <SelectLabel>Voting</SelectLabel>
+                                {[10,15,20].map((n) => (
+                                  <SelectItem key={n} value={String(n)}>{n} seconds</SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {!!roomCode && (
+                          <>
+                            <div className="grid gap-2">
+                              <Label htmlFor="room-name">Room name</Label>
                               <Input
-                                value={answers[index] || ""}
-                                onChange={(e) => setAnswers(prev => ({ ...prev, [index]: e.target.value }))}
-                                placeholder={`Something that starts with ${currentLetter}...`}
-                                className="glass-card"
-                                disabled={timeLeft === 0}
+                                id="room-name"
+                                value={roomName}
+                                onChange={(e) => setRoomName(e.target.value.slice(0, 40))}
+                                placeholder="e.g. Alex’s Room"
+                                disabled={!isHost || matchInProgress}
                               />
                             </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    )}
-                  </Card>
-                )}
+                            <div className="flex items-center justify-between">
+                              <div className="grid gap-1">
+                                <Label htmlFor="public-toggle">Public listing</Label>
+                                <p className="text-sm text-muted-foreground">Show this room in the Lobby list.</p>
+                              </div>
+                              <Switch
+                                id="public-toggle"
+                                checked={publicListing}
+                                onCheckedChange={(v) => setPublicListing(!!v)}
+                                disabled={!isHost}
+                                aria-label="Toggle public listing"
+                              />
+                            </div>
+                          </>
+                        )}
 
-                {gamePhase === "final" && (
-                  <Card className="glass-panel">
-                    <CardHeader className="text-center">
-                      <CardTitle className="flex items-center justify-center gap-2 text-3xl">
-                        <Trophy className="w-8 h-8 text-yellow-500" />
-                        Game Complete!
-                      </CardTitle>
-                      <CardDescription>
-                        Thanks for playing! Check out the final scores.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-center space-y-4">
-                      <Button
-                        onClick={() => setShowFinalScoreboard(true)}
-                        size="lg"
-                        className="glass-card hover:scale-105"
-                      >
-                        <Trophy className="w-5 h-5 mr-2" />
-                        View Final Scores
+                        {!!roomCode && !isHost && (
+                          <div className="text-sm text-muted-foreground">Only the host can change settings.</div>
+                        )}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+  
+                  <Button variant="secondary" onClick={leaveRoom} className="hover-scale">Leave Room</Button>
+                </div>
+              )}
+            </header>
+  
+            <section className="grid gap-4 md:grid-cols-[1fr,360px]">
+              <article>
+                <Card className="animate-fade-in bg-background/60 backdrop-blur-xl border border-border/60 shadow-[var(--shadow-elegant)]">
+                  <CardHeader className="flex flex-row items-center justify-between sticky top-0 z-10 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                    <CardTitle className="text-lg sm:text-xl">Your List</CardTitle>
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      {roomCode && (running || showResults || votingActive || roundsPlayed > 0) && (
+                        <div className="rounded-full border px-2 py-0.5 text-xs sm:px-3 sm:py-1">Round {displayRound}/{roundsPerMatch}</div>
+                      )}
+                      <div className="rounded-full border px-3 py-1 text-base font-semibold hidden xs:block">
+                        {letter ?? "–"}
+                      </div>
+                      <div className="w-32 sm:w-40">
+                        <Progress value={progress} />
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {running ? `${timeLeft}s remaining` : "Timer idle"}
+                        </div>
+                      </div>
+                      {votingActive && (
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full border px-2 py-0.5 text-xs sm:px-3 sm:py-1">Voting {voteTimeLeft}s</span>
+                          {isHost && (
+                            <Button variant="secondary" size="sm" onClick={() => {
+                              setVoteTimeLeft((t) => t + 5);
+                              channelRef.current?.send({ type: 'broadcast', event: 'vote_extend', payload: { add: 5 } });
+                            }}>
+                              +5s
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pb-4 sm:pb-6">
+                    <div className="grid gap-4">
+                      {letter && running ? (
+                        activeCategories.map((cat, idx) => (
+                          <div key={idx} className="grid gap-2">
+                            <Label htmlFor={`cat-${idx}`}>{idx + 1}. {cat}</Label>
+                            <Input
+                              id={`cat-${idx}`}
+                              placeholder={letter ? `Starts with ${letter}` : "Start a round to get a letter"}
+                              value={answers[idx] ?? ""}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                if (!letter) return;
+                                if (v.length === 0) {
+                                  setAnswers((prev) => ({ ...prev, [idx]: "" }));
+                                  return;
+                                }
+                                const first = v.trimStart().charAt(0).toUpperCase();
+                                if (first === letter.toUpperCase()) {
+                                  setAnswers((prev) => ({ ...prev, [idx]: v }));
+                                }
+                              }}
+                              disabled={!letter}
+                            />
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-sm text-muted-foreground">Categories will be revealed when the round starts.</div>
+                      )}
+                    </div>
+                    <div className="mt-4 sm:mt-6 flex items-center gap-2 sm:gap-3">
+                      <Button onClick={startRound} disabled={running || votingActive || roundStarting || (!!roomCode && (!isHost || !allReady))} className="hover-scale w-full sm:w-auto" title={roomCode && isHost && !allReady ? "Waiting for players to ready up" : undefined}>
+                        {primaryButtonLabel}
                       </Button>
-                      
-                      {(!isMultiplayer || isHost) && (
-                        <Button
-                          onClick={() => {
-                            setGamePhase("lobby");
-                            setCurrentRound(1);
-                            setAnswers({});
-                            setAllResults({});
-                            setVotes({});
-                            setRoundScores({});
-                          }}
-                          variant="outline"
-                          size="lg"
-                          className="glass-card hover:scale-105 ml-4"
-                        >
-                          <RotateCcw className="w-5 h-5 mr-2" />
-                          Play Again
+                      {running && (
+                        <Button variant="outline" onClick={submitRound} className="hover-scale w-full sm:w-auto">
+                          Submit Round
                         </Button>
                       )}
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-
-              {/* Sidebar */}
-              <div className="space-y-6">
-                {/* Players List */}
-                <Card className="glass-panel">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="w-5 h-5" />
-                      Players ({players.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {players.map((player) => (
-                        <div key={player.id} className="flex items-center gap-3 p-2 rounded glass-card">
-                          <Avatar className="w-8 h-8">
-                            <AvatarFallback style={{ backgroundImage: gradientFromString(player.name), color: "white" }}>
-                              {initialsFromName(player.name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              {player.isHost && <Crown className="w-4 h-4 text-yellow-500" />}
-                              <span className="font-medium truncate">
-                                {player.id === localPlayerId ? "You" : player.name}
-                              </span>
-                              {streaks[player.id] > 0 && (
-                                <div className="flex items-center gap-1 text-xs text-orange-500">
-                                  <Flame className="w-3 h-3" />
-                                  {streaks[player.id]}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                      {roomCode && isHost && running && (
+                        <Button variant="outline" onClick={endRoundEarly} className="hover-scale w-full sm:w-auto">
+                          End Round (Host)
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
-
-                {/* Chat Panel */}
-                {isMultiplayer && (
-                  <ChatPanel
-                    messages={chatMessages}
-                    onSend={sendChatMessage}
-                    currentName={localPlayerName}
-                    hostId={players.find(p => p.isHost)?.id}
-                    streaks={streaks}
-                  />
+              </article>
+  
+              <aside>
+                {!roomCode && (
+                  <Card className="animate-fade-in bg-background/60 backdrop-blur-xl border border-border/60 shadow-[var(--shadow-elegant)]">
+                    <CardHeader>
+                      <CardTitle>Round Settings</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-4">
+                      <div className="grid gap-2">
+                        <Label>Timer</Label>
+                        <Select value={String(timer)} onValueChange={(v) => setTimer(parseInt(v, 10))}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select duration" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectLabel>Duration</SelectLabel>
+                              <SelectItem value="60">60 seconds</SelectItem>
+                              <SelectItem value="120">120 seconds</SelectItem>
+                              <SelectItem value="180">180 seconds</SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Scoring in solo mode counts filled categories. Multiplayer uniqueness rules will be added with realtime rooms.
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
-              </div>
-            </div>
+  
+                {roomCode && (
+                  <>
+                    <Card className="animate-fade-in bg-background/60 backdrop-blur-xl border border-border/60 shadow-[var(--shadow-elegant)]">
+                      <CardHeader>
+                        <CardTitle>Players in Room</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ScrollArea className="h-48">
+                          <div className="space-y-3 pr-2">
+                            {players.length === 0 ? (
+                              <div className="text-sm text-muted-foreground">No players yet</div>
+                            ) : (
+                              players.map((p) => (
+                                <div key={p.id} className="flex items-center gap-3">
+                                  <Avatar className="border shadow">
+                                    <AvatarFallback style={{ backgroundImage: gradientFromString(p.name), color: "white" }}>
+                                      {initialsFromName(p.name)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="text-sm">
+                                    <div className="font-medium flex items-center gap-2">
+                                      {p.id === hostId ? <Crown className="h-3.5 w-3.5 text-primary" aria-label="Host" /> : null}
+                                      {readyMap[p.id] ? <CheckCircle className="h-3.5 w-3.5 text-primary" aria-label="Ready" /> : null}
+                                      {p.name} {p.id === playerId ? <span className="text-muted-foreground">(You)</span> : null}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </ScrollArea>
+                      </CardContent>
+                    </Card>
+  
+                    <div className="mt-6 animate-fade-in">
+                      <ChatPanel
+                        messages={messages}
+                        onSend={(text) => {
+                          if (!channelRef.current) return;
+                          const payload = { id: playerId, name: profileName, text, ts: Date.now() } as ChatMessage;
+                          channelRef.current.send({ type: 'broadcast', event: 'chat', payload });
+                          setMessages((m) => [...m, payload].slice(-200));
+                        }}
+                        currentName={profileName}
+                        hostId={hostId}
+                        leaderId={leaderId ?? undefined}
+                        streaks={streaks}
+                      />
+                    </div>
+                  </>
+                )}
+              </aside>
+            </section>
           </div>
-        </div>
-
-        {/* Results Overlay */}
-        <ResultsOverlay
-          open={showResults}
-          onClose={() => setShowResults(false)}
-          results={allResults}
-          presentCount={players.length}
-          votes={votes}
-          onVote={handleVote}
-          categories={categories}
-          localPlayerId={localPlayerId}
-          voteTimeLeft={timeLeft}
-          players={players}
-        />
-
-        {/* Final Scoreboard */}
-        <FinalScoreboard
-          open={showFinalScoreboard}
-          onClose={() => setShowFinalScoreboard(false)}
-          summary={finalSummary}
-          isHost={!isMultiplayer || isHost}
-          onPlayAgain={() => {
-            setGamePhase("lobby");
-            setShowFinalScoreboard(false);
-            setCurrentRound(1);
-            setAnswers({});
-            setAllResults({});
-            setVotes({});
-            setRoundScores({});
-          }}
-        />
+        </main>
       </div>
+      {roomCode && (
+        <>
+          <ResultsOverlay
+            open={showResults}
+            onClose={() => setShowResults(false)}
+            results={results}
+            presentCount={presentCount}
+            votes={votes}
+            onVote={(key) => {
+              if (!channelRef.current) return;
+              channelRef.current.send({ type: 'broadcast', event: 'vote', payload: { key, voterId: playerId } });
+              setVotes((prev) => {
+                const set = new Set([...(prev[key] || [])]);
+                set.add(playerId);
+                return { ...prev, [key]: Array.from(set) };
+              });
+              playVote();
+            }}
+            categories={activeCategories}
+            localPlayerId={playerId}
+            voteTimeLeft={voteTimeLeft}
+            players={players}
+          />
+          <FinalScoreboard
+            open={finalOpen}
+            onClose={() => setFinalOpen(false)}
+            summary={matchSummary}
+            isHost={isHost}
+            onPlayAgain={() => {
+              setFinalOpen(false);
+              setMatchTotals({});
+              setStreaks({});
+              setLeaderId(null);
+              setUsedListIds(new Set());
+              setRoundsPlayed(0);
+              setCurrentRoundIndex(0);
+              startRound();
+            }}
+          />
+        </>
+      )}
     </>
   );
 };

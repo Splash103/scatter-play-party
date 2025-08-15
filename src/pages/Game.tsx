@@ -188,7 +188,6 @@ export default function Game() {
   
   // UI state
   const [showSettings, setShowSettings] = useState(false);
-  const [showFinalResults, setShowFinalResults] = useState(false);
   const [showStopDialog, setShowStopDialog] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -200,6 +199,12 @@ export default function Game() {
   const [votes, setVotes] = useState<Record<string, string[]>>({});
   const [results, setResults] = useState<Record<string, any>>({});
   const [finalSummary, setFinalSummary] = useState<FinalSummary | null>(null);
+  const [resultsOpen, setResultsOpen] = useState(false);
+  const [showRoundTransition, setShowRoundTransition] = useState(false);
+  const [roomCreatorId, setRoomCreatorId] = useState<string | null>(null);
+  const [finalScoreboardOpen, setFinalScoreboardOpen] = useState(false);
+  const [showFinalResults, setShowFinalResults] = useState(false);
+  const [transitionText, setTransitionText] = useState("");
   
   // Rock Paper Scissors state
   const [showRockPaperScissors, setShowRockPaperScissors] = useState(false);
@@ -628,8 +633,13 @@ export default function Game() {
     return scores;
   };
 
-    setResultsOpen(false); // Stop the results timer loop
+  const scoreFor = (result: any) => {
+    // Simple scoring logic - 1 point per valid answer
+    return Object.values(result.answers || {}).filter(answer => answer && answer.length > 0).length;
+  };
+
   const showFinalResults = async (finalScores: Record<string, number>) => {
+    setResultsOpen(false); // Stop the results timer loop
     // Find the highest score
     const maxScore = Math.max(...Object.values(finalScores));
     const winners = Object.entries(finalScores)
@@ -666,7 +676,6 @@ export default function Game() {
       const { error } = await supabase
         .from('match_wins')
         .insert({
-          user_id: user.id,
           match_id: `${roomCode}-${Date.now()}` // Simple match ID
         });
         
@@ -686,6 +695,16 @@ export default function Game() {
       console.error('Error in recordWin:', error);
     }
   };
+
+  const handlePostResults = useCallback(() => {
+    // Handle post-results logic here
+  }, [gamePhase, finalScoreboardOpen, currentRound, settings.maxRounds]);
+
+  useEffect(() => {
+    if (resultsOpen && gamePhase === "results") {
+      handlePostResults();
+    }
+  }, [resultsOpen, gamePhase, handlePostResults]);
 
   const nextRound = () => {
     if (!isHost) return;
@@ -1048,24 +1067,23 @@ export default function Game() {
       </div>
 
       {/* Chat Panel */}
-        {/* Round Transition */}
-        {showRoundTransition && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="glass-panel p-8 text-center animate-scale-in">
-              <h2 className="text-4xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent mb-4">
-                {transitionText}
-              </h2>
-              <div className="w-16 h-16 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-            </div>
+      {/* Round Transition */}
+      {showRoundTransition && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="glass-panel p-8 text-center animate-scale-in">
+            <h2 className="text-4xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent mb-4">
+              {transitionText}
+            </h2>
+            <div className="w-16 h-16 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
           </div>
-        )}
+        </div>
+      )}
 
       {isMultiplayer && (
         <div className="space-y-6">
           <ChatPanel
             messages={chatMessages}
             onSend={sendChatMessage}
-            hostId={roomCreatorId}
             hostId={players.find(p => p.isHost)?.id}
             streaks={players.reduce((acc, p) => ({ ...acc, [p.id]: p.streak || 0 }), {})}
           />
@@ -1366,7 +1384,7 @@ export default function Game() {
                         <SelectItem value="120">2 minutes</SelectItem>
                         <SelectItem value="180">3 minutes</SelectItem>
                         <SelectItem value="300">5 minutes</SelectItem>
-                       <SelectItem value="30">30 seconds</SelectItem>
+                        <SelectItem value="30">30 seconds</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

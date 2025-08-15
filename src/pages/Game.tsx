@@ -842,7 +842,7 @@ export default function Game() {
     if (!channelRef.current) return;
     
     channelRef.current.send({
-    if (hostId !== playerId || !channelRef.current) return;
+      type: "broadcast",
       event: "rps_choice",
       payload: { playerId, choice }
     });

@@ -339,7 +339,366 @@ const Game = () => {
       })
       .on("broadcast", { event: "force_end_round" }, ({ payload }) => {
         if (payload.phase === "playing") {
-          // Auto-submit for everyone who hasn't submitted
+          // Auto-submit current answers if not already submitted
+          if (!results[playerId]) {
+            const playerResult: PlayerResult = {
+              playerId,
+              name: playerName,
+              letter,
+              answers
+            };
+            setResults(prev => ({ ...prev, [playerId]: playerResult }));
+          }
+        } else if (payload.phase === "voting") {
+          setPhase("results");
+          setShowResults(false);
+        }
+      })
+      .on("broadcast", { event: "vote_cast" }, ({ payload }) => {
+        setVotes(prev => ({
+          ...prev,
+          [payload.voteKey]: [...(prev[payload.voteKey] || []), payload.voterId]
+        }));
+      })
+      .on("broadcast", { event: "chat_message" }, ({ payload }) => {
+        setMessages(prev => [...prev, payload]);
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await channel.track({
+            name: playerName,
+            isHost: isHost
+          });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [roomCode, playerName, playerId, isHost, hostId, startTimer, playRoundStart, results, letter, answers]);
+
+  // Timer effects
+  useEffect(() => {
+    if (timeLeft === 0 && phase === "playing") {
+      submitAnswers();
+    }
+    if (timeLeft === 0 && phase === "voting") {
+      setPhase("results");
+      setShowResults(false);
+      calculateScores();
+    }
+  }, [timeLeft, phase, submitAnswers, calculateScores]);
+
+  // Handle results phase transition
+  useEffect(() => {
+    if (phase === "results") {
+      const timer = setTimeout(() => {
+        calculateScores();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [phase, calculateScores]);
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
+  if (!playerName) {
+    return (
+      <div className="min-h-screen flex items-center justify-center card-game-bg">
+        <Card className="glass-panel">
+          <CardContent className="p-6">
+            <div className="text-center">Setting up...</div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Helmet>
+        <title>{roomCode ? `Room ${roomCode}` : "Solo Game"} — Scattergories Online</title>
+        <meta name="description" content="Play Scattergories with friends in real-time multiplayer rooms." />
+      </Helmet>
+
+      <div className="relative min-h-screen card-game-bg">
+        <Aurora />
+        <Particles />
+        
+        {/* Header */}
+        <div className="relative z-10 border-b border-border/20 bg-background/80 backdrop-blur-sm">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <h1 className="text-2xl font-bold">
+                  {roomCode ? `Room ${roomCode}` : "Solo Game"}
+                </h1>
+                {roomCode && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copyRoomCode}
+                    className="glass-card hover:scale-105"
+                  >
+                    {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+                    {copied ? "Copied!" : "Copy Code"}
+                  </Button>
+                )}
+              </div>
+              
+              <div className="flex items-center gap-2">
+                {/* Sound Toggle */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSoundEnabled(!soundEnabled);
+                    localStorage.setItem("soundEnabled", (!soundEnabled).toString());
+                  }}
+                  className="glass-card hover:scale-105"
+                >
+                  {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                </Button>
+                
+                {/* Chat Toggle */}
+                {roomCode && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowChat(!showChat)}
+                    className="glass-card hover:scale-105"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                  </Button>
+                )}
+                
+                {/* Settings */}
+                {isPlayerHost && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSettings(!showSettings)}
+                    className="glass-card hover:scale-105"
+                  >
+                    <Settings className="w-4 h-4" />
+                  </Button>
+                )}
+                
+                {/* Leave Room */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate("/")}
+                  className="glass-card hover:scale-105 text-destructive hover:text-destructive"
+                >
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative z-10 container mx-auto px-4 py-6">
+          <div className="grid gap-6 lg:grid-cols-4">
+            {/* Main Game Area */}
+            <div className="lg:col-span-3 space-y-6">
+              {/* Game Status */}
+              <Card className="glass-panel">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        {phase === "lobby" && <Users className="w-5 h-5 text-primary" />}
+                        {phase === "playing" && <Timer className="w-5 h-5 text-green-500" />}
+                        {phase === "voting" && <Trophy className="w-5 h-5 text-yellow-500" />}
+                        {phase === "results" && <Trophy className="w-5 h-5 text-blue-500" />}
+                        
+                        {phase === "lobby" && "Waiting to Start"}
+                        {phase === "playing" && `Round ${currentRound} - Playing`}
+                        {phase === "voting" && `Round ${currentRound} - Voting`}
+                        {phase === "results" && `Round ${currentRound} - Results`}
+                      </CardTitle>
+                      <CardDescription>
+                        {phase === "lobby" && "Get ready to play Scattergories!"}
+                        {phase === "playing" && `Find words starting with "${letter}" for each category`}
+                        {phase === "voting" && "Vote on questionable answers"}
+                        {phase === "results" && "Round complete!"}
+                      </CardDescription>
+                    </div>
+                    
+                    {(phase === "playing" || phase === "voting") && (
+                      <div className="text-right">
+                        <div className="text-3xl font-bold text-primary">{timeLeft}</div>
+                        <div className="text-sm text-muted-foreground">seconds</div>
+                      </div>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {(phase === "playing" || phase === "voting") && (
+                    <Progress 
+                      value={((phase === "playing" ? roundTime : voteTime) - timeLeft) / (phase === "playing" ? roundTime : voteTime) * 100} 
+                      className="mt-4"
+                    />
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Lobby Phase */}
+              {phase === "lobby" && (
+                <Card className="glass-panel">
+                  <CardHeader>
+                    <CardTitle>Game Setup</CardTitle>
+                    <CardDescription>Configure your game settings</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="text-center text-muted-foreground">
+                      <p>Current settings: <strong>{selectedList.name}</strong> • <strong>{totalRounds} Round{totalRounds !== 1 ? 's' : ''}</strong></p>
+                      {isPlayerHost && (
+                        <p className="text-xs mt-1">Use the settings button to configure game options</p>
+                      )}
+                    </div>
+                    
+                    {isPlayerHost && (
+                      <div className="flex gap-2">
+                        <Button onClick={startRound} className="glass-card hover:scale-105">
+                          <Play className="w-4 h-4 mr-2" />
+                          Start Game
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => setSelectedList(generateRandomList())}
+                          className="glass-card hover:scale-105"
+                        >
+                          <Shuffle className="w-4 h-4 mr-2" />
+                          Random Categories
+                        </Button>
+                      </div>
+                    )}
+                    
+                    {!isPlayerHost && (
+                      <div className="text-center text-sm text-muted-foreground">
+                        Waiting for host to start the game...
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Playing Phase */}
+              {phase === "playing" && (
+                <div className="space-y-6">
+                <Card className="glass-panel">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold">
+                          {letter}
+                        </div>
+                        <div>
+                          <CardTitle>Answer Categories</CardTitle>
+                          <CardDescription>
+                            Find words that start with "{letter}" for each category below
+                          </CardDescription>
+                        </div>
+                      </div>
+                      {isPlayerHost && (
+                        <Button 
+                          variant="destructive" 
+                          size="sm" 
+                          onClick={forceEndRound}
+                          className="glass-card hover:scale-105"
+                        >
+                          Force End Round
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {categories.map((category, index) => (
+                        <div key={index} className="space-y-2">
+                          <label className="text-sm font-medium">
+                            {index + 1}. {category}
+                          </label>
+                          <Input
+                            value={answers[index] || ""}
+                            onChange={(e) => setAnswers(prev => ({ ...prev, [index]: e.target.value }))}
+                            placeholder={`Something starting with ${letter}...`}
+                            className="glass-card"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="mt-6 flex justify-center">
+                      <Button onClick={submitAnswers} className="glass-card hover:scale-105">
+                        Submit Answers
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+                </div>
+              )}
+
+              {/* Voting Phase */}
+              {phase === "voting" && (
+                <Card className="glass-panel">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Voting Phase</CardTitle>
+                        <CardDescription>
+                          Vote on questionable answers. Results will show automatically.
+                        </CardDescription>
+                      </div>
+                      {isPlayerHost && (
+                        <Button 
+                          variant="destructive" 
+                          size="sm" 
+                          onClick={forceEndRound}
+                          className="glass-card hover:scale-105"
+                        >
+                          Force End Voting
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center py-8">
+                      <div className="text-lg font-medium mb-2">Reviewing Answers...</div>
+                      <div className="text-sm text-muted-foreground">
+                        Vote on any answers you think should be disqualified
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Results Phase */}
+              {phase === "results" && (
+                <Card className="glass-panel">
+                  <CardHeader>
+                    <CardTitle>Round Complete!</CardTitle>
+                    <CardDescription>
+                      Calculating scores and preparing next round...
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center py-8">
+                      <div className="text-lg font-medium mb-2">Round {currentRound} Results</div>
+                      <div className="text-sm text-muted-foreground">
+                        {currentRound < totalRounds ? "Next round starting soon..." : "Preparing final results..."}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           const playerResult: PlayerResult = {
             playerId,
             name: playerName,
@@ -402,13 +761,23 @@ const Game = () => {
     if (!isPlayerHost) return;
     
     if (phase === "playing") {
-      // Force submit for all players
+      // Auto-submit current player's answers and transition to voting
+      const playerResult: PlayerResult = {
+        playerId,
+        name: playerName,
+        letter,
+        answers
+      };
+      setResults(prev => ({ ...prev, [playerId]: playerResult }));
+      
       channelRef.current?.send({
         type: "broadcast",
         event: "force_end_round",
         payload: { phase: "playing" }
       });
     } else if (phase === "voting") {
+      setPhase("results");
+      setShowResults(false);
       channelRef.current?.send({
         type: "broadcast",
         event: "force_end_round", 

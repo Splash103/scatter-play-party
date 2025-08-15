@@ -417,9 +417,6 @@ export default function Game() {
         title: "Cannot start",
         description: "At least one player must be ready."
       });
-      
-      // Check if all players have submitted
-      setTimeout(checkAllSubmitted, 500);
       return;
     }
 
@@ -845,48 +842,12 @@ export default function Game() {
     if (!channelRef.current) return;
     
     channelRef.current.send({
-      type: "broadcast",
+    if (hostId !== playerId || !channelRef.current) return;
       event: "rps_choice",
       payload: { playerId, choice }
     });
     
     setRpsChoices(prev => ({ ...prev, [playerId]: choice }));
-  // Check if all players have submitted
-  const checkAllSubmitted = async () => {
-    if (hostId !== playerId || !channelRef.current) return;
-    
-    const submittedCount = Object.keys(gameState.results).length;
-    const totalPlayers = gameState.players.length;
-    
-    if (submittedCount === totalPlayers && gameState.phase === "playing") {
-      // All players submitted, move to voting
-      const newGameState = {
-        ...gameState,
-        phase: "voting" as const,
-        roundTimeLeft: 0,
-        voteTimeLeft: gameState.settings.voteTime,
-      };
-      
-      try {
-        await channelRef.current.send({
-          type: "broadcast",
-          event: "stop_round",
-          payload: { gameState: newGameState }
-        });
-        
-        setGameState(newGameState);
-        setShowResults(true);
-        
-        toast({
-          title: "All players submitted!",
-          description: "Moving to voting phase..."
-        });
-      } catch (error) {
-        console.error("Failed to auto-stop round:", error);
-      }
-    }
-  };
-
     
     // Check if all tied players have made choices
     const allChoices = { ...rpsChoices, [playerId]: choice };

@@ -74,9 +74,9 @@ const Index = () => {
           </header>
 
           <main className="grid gap-8 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 mb-8">
-            <Card className="glass-card floating-card group cursor-pointer hover:shadow-2xl transition-all duration-500 border-0 bg-gradient-to-br from-white/10 to-white/5" style={{ animationDelay: '0s' }}>
+            <Card className="glass-card floating-card group cursor-pointer hover:shadow-2xl transition-all duration-300 border-0 bg-gradient-to-br from-white/10 to-white/5" style={{ animationDelay: '0s' }}>
               <CardHeader className="text-center pb-4">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+                <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-xl group-hover:scale-105 transition-all duration-300">
                   <Gamepad2 className="text-white w-8 h-8" />
                 </div>
                 <CardTitle className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Quick Play</CardTitle>
@@ -89,9 +89,9 @@ const Index = () => {
               </CardFooter>
             </Card>
 
-            <Card className="glass-card floating-card group cursor-pointer hover:shadow-2xl transition-all duration-500 border-0 bg-gradient-to-br from-white/10 to-white/5" style={{ animationDelay: '0.2s' }}>
+            <Card className="glass-card floating-card group cursor-pointer hover:shadow-2xl transition-all duration-300 border-0 bg-gradient-to-br from-white/10 to-white/5" style={{ animationDelay: '0.2s' }}>
               <CardHeader className="text-center pb-4">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center shadow-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+                <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center shadow-xl group-hover:scale-105 transition-all duration-300">
                   <Users className="text-white w-8 h-8" />
                 </div>
                 <CardTitle className="text-xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">Game Lobby</CardTitle>
@@ -104,9 +104,9 @@ const Index = () => {
               </CardFooter>
             </Card>
 
-            <Card className="glass-card floating-card group cursor-pointer hover:shadow-2xl transition-all duration-500 border-0 bg-gradient-to-br from-white/10 to-white/5" style={{ animationDelay: '0.4s' }}>
+            <Card className="glass-card floating-card group cursor-pointer hover:shadow-2xl transition-all duration-300 border-0 bg-gradient-to-br from-white/10 to-white/5" style={{ animationDelay: '0.4s' }}>
               <CardHeader className="text-center pb-4">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+                <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-xl group-hover:scale-105 transition-all duration-300">
                   <UserCircle2 className="text-white w-8 h-8" />
                 </div>
                 <CardTitle className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Player Profile</CardTitle>
@@ -133,9 +133,9 @@ const Index = () => {
               </CardFooter>
             </Card>
 
-            <Card className="glass-card floating-card group cursor-pointer hover:shadow-2xl transition-all duration-500 border-0 bg-gradient-to-br from-white/10 to-white/5" style={{ animationDelay: '0.6s' }}>
+            <Card className="glass-card floating-card group cursor-pointer hover:shadow-2xl transition-all duration-300 border-0 bg-gradient-to-br from-white/10 to-white/5" style={{ animationDelay: '0.6s' }}>
               <CardHeader className="text-center pb-4">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-yellow-500 to-orange-600 flex items-center justify-center shadow-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+                <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-yellow-500 to-orange-600 flex items-center justify-center shadow-xl group-hover:scale-105 transition-all duration-300">
                   <Trophy className="text-white w-8 h-8" />
                 </div>
                 <CardTitle className="text-xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">Champions</CardTitle>

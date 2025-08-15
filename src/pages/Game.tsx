@@ -200,6 +200,12 @@ export default function Game() {
   const [results, setResults] = useState<Record<string, any>>({});
   const [finalSummary, setFinalSummary] = useState<FinalSummary | null>(null);
   
+  // Rock Paper Scissors state
+  const [showRockPaperScissors, setShowRockPaperScissors] = useState(false);
+  const [rpsChoices, setRpsChoices] = useState<Record<string, string>>({});
+  const [rpsResults, setRpsResults] = useState<string | null>(null);
+  const [tiedPlayers, setTiedPlayers] = useState<Player[]>([]);
+  
   // Refs and hooks
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -316,6 +322,28 @@ export default function Game() {
         setFinalSummary(payload.summary);
         setShowFinalResults(true);
         playWin();
+      })
+      .on("broadcast", { event: "stop_round" }, () => {
+        endRound();
+      })
+      .on("broadcast", { event: "rps_choice" }, ({ payload }) => {
+        setRpsChoices(prev => ({ ...prev, [payload.playerId]: payload.choice }));
+      })
+      .on("broadcast", { event: "rps_results" }, ({ payload }) => {
+        setRpsResults(payload.winner);
+        setTimeout(() => {
+          setShowRockPaperScissors(false);
+          setRpsChoices({});
+          setRpsResults(null);
+          // Update final summary with tiebreaker winner
+          if (finalSummary) {
+            const updatedSummary = {
+              ...finalSummary,
+              winners: [{ id: payload.winnerId, name: payload.winner, total: finalSummary.winners[0].total }]
+            };
+            setFinalSummary(updatedSummary);
+          }
+        }, 3000);
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
@@ -481,6 +509,16 @@ export default function Game() {
   const stopRound = () => {
     if (!isHost) return;
     setShowStopDialog(false);
+    
+    // Broadcast stop round to all players
+    if (isMultiplayer) {
+      channelRef.current?.send({
+        type: "broadcast",
+        event: "stop_round",
+        payload: {}
+      });
+    }
+    
     endRound();
   };
 
@@ -535,6 +573,13 @@ export default function Game() {
     // Check if game should end
     if (currentRound >= settings.maxRounds) {
       setTimeout(() => endGame(), 3000);
+    } else {
+      // Move to next round after delay
+      setTimeout(() => {
+        if (isHost) {
+          nextRound();
+        }
+      }, 5000);
     }
   };
 
@@ -553,7 +598,19 @@ export default function Game() {
       return acc;
     }, {} as Record<string, number>);
 
-    const winners = players
+    const maxScore = Math.max(...players.map(p => p.score || 0));
+    const potentialWinners = players
+      .filter(p => p.score === maxScore);
+
+    // Check for ties
+    if (potentialWinners.length > 1 && isMultiplayer) {
+      // Start rock paper scissors tiebreaker
+      setTiedPlayers(potentialWinners);
+      setShowRockPaperScissors(true);
+      return;
+    }
+
+    const winners = potentialWinners
       .filter(p => p.score === Math.max(...players.map(p => p.score || 0)))
       .map(p => ({ id: p.id, name: p.name, total: p.score || 0 }));
 
@@ -636,6 +693,71 @@ export default function Game() {
     const categoryAnswers = answers[category] || ["Answer"];
     const validAnswers = categoryAnswers.filter(a => a.startsWith(letter));
     return validAnswers[Math.floor(Math.random() * validAnswers.length)] || `${letter}...`;
+  };
+
+  const makeRpsChoice = (choice: string) => {
+    if (!channelRef.current) return;
+    
+    channelRef.current.send({
+      type: "broadcast",
+      event: "rps_choice",
+      payload: { playerId, choice }
+    });
+    
+    setRpsChoices(prev => ({ ...prev, [playerId]: choice }));
+    
+    // Check if all tied players have made choices
+    const allChoices = { ...rpsChoices, [playerId]: choice };
+    if (Object.keys(allChoices).length === tiedPlayers.length && isHost) {
+      // Determine winner
+      const choices = Object.entries(allChoices);
+      const winner = determineRpsWinner(choices);
+      
+      channelRef.current.send({
+        type: "broadcast",
+        event: "rps_results",
+        payload: { 
+          winner: winner.name,
+          winnerId: winner.id
+        }
+      });
+      
+      setRpsResults(winner.name);
+    }
+  };
+  
+  const determineRpsWinner = (choices: [string, string][]): { id: string; name: string } => {
+    // Simple rock paper scissors logic for 2+ players
+    const playerChoices = choices.map(([id, choice]) => ({ 
+      id, 
+      choice, 
+      name: players.find(p => p.id === id)?.name || "Player" 
+    }));
+    
+    // For simplicity, if all choices are the same, pick random
+    const uniqueChoices = [...new Set(playerChoices.map(p => p.choice))];
+    if (uniqueChoices.length === 1) {
+      const randomIndex = Math.floor(Math.random() * playerChoices.length);
+      return { id: playerChoices[randomIndex].id, name: playerChoices[randomIndex].name };
+    }
+    
+    // Standard RPS logic for 2 players, or pick winner based on choice priority
+    if (uniqueChoices.includes("rock") && uniqueChoices.includes("scissors")) {
+      const winner = playerChoices.find(p => p.choice === "rock");
+      return { id: winner!.id, name: winner!.name };
+    }
+    if (uniqueChoices.includes("paper") && uniqueChoices.includes("rock")) {
+      const winner = playerChoices.find(p => p.choice === "paper");
+      return { id: winner!.id, name: winner!.name };
+    }
+    if (uniqueChoices.includes("scissors") && uniqueChoices.includes("paper")) {
+      const winner = playerChoices.find(p => p.choice === "scissors");
+      return { id: winner!.id, name: winner!.name };
+    }
+    
+    // Fallback to random
+    const randomIndex = Math.floor(Math.random() * playerChoices.length);
+    return { id: playerChoices[randomIndex].id, name: playerChoices[randomIndex].name };
   };
 
   const copyRoomCode = async () => {
@@ -818,7 +940,7 @@ export default function Game() {
                     <div className="text-sm text-muted-foreground mt-1">Letter</div>
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold">Round {currentRound + 1}</h2>
+                    <h2 className="text-2xl font-bold">Round {currentRound + 1}/{settings.maxRounds}</h2>
                     <p className="text-muted-foreground">Find words starting with "{roundData.letter}"</p>
                   </div>
                 </div>
@@ -1249,6 +1371,67 @@ export default function Game() {
           />
         )}
       </div>
+
+      {/* Rock Paper Scissors Tiebreaker */}
+      <Dialog open={showRockPaperScissors} onOpenChange={() => {}}>
+        <DialogContent className="glass-panel border-0 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl text-center mb-4 flex items-center justify-center gap-2">
+              <Trophy className="w-6 h-6 text-yellow-500" />
+              Tiebreaker!
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              {rpsResults ? (
+                <span className="text-lg font-medium text-green-600">
+                  🎉 {rpsResults} wins the tiebreaker!
+                </span>
+              ) : (
+                <>
+                  Multiple players tied! Choose your move:
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    Tied players: {tiedPlayers.map(p => p.name).join(", ")}
+                  </div>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {!rpsResults && tiedPlayers.some(p => p.id === playerId) && (
+            <div className="grid grid-cols-3 gap-4 mt-6">
+              <Button
+                onClick={() => makeRpsChoice("rock")}
+                disabled={!!rpsChoices[playerId]}
+                className="glass-card hover:scale-105 h-20 flex-col"
+              >
+                <span className="text-2xl mb-1">🪨</span>
+                <span>Rock</span>
+              </Button>
+              <Button
+                onClick={() => makeRpsChoice("paper")}
+                disabled={!!rpsChoices[playerId]}
+                className="glass-card hover:scale-105 h-20 flex-col"
+              >
+                <span className="text-2xl mb-1">📄</span>
+                <span>Paper</span>
+              </Button>
+              <Button
+                onClick={() => makeRpsChoice("scissors")}
+                disabled={!!rpsChoices[playerId]}
+                className="glass-card hover:scale-105 h-20 flex-col"
+              >
+                <span className="text-2xl mb-1">✂️</span>
+                <span>Scissors</span>
+              </Button>
+            </div>
+          )}
+          
+          {!rpsResults && (
+            <div className="mt-4 text-center text-sm text-muted-foreground">
+              Choices made: {Object.keys(rpsChoices).length}/{tiedPlayers.length}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

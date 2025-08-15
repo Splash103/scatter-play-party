@@ -83,6 +83,7 @@ const Game = () => {
   const [votes, setVotes] = useState<Record<string, string[]>>({});
   const [scores, setScores] = useState<Record<string, number>>({});
   const [streaks, setStreaks] = useState<Record<string, number>>({});
+  const [hasSubmitted, setHasSubmitted] = useState(false);
 
   // Chat
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -183,6 +184,14 @@ const Game = () => {
       .on("broadcast", { event: "show_final" }, ({ payload }) => {
         setFinalSummary(payload);
         setShowFinal(true);
+      })
+      .on("broadcast", { event: "submit_answers" }, ({ payload }) => {
+        setResults(prev => ({ ...prev, [payload.playerId]: payload }));
+      })
+      .on("broadcast", { event: "force_submit_all" }, () => {
+        if (!hasSubmitted) {
+          submitAnswers();
+        }
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
@@ -287,7 +296,58 @@ const Game = () => {
     playRoundStart();
   }, [selectedList, currentRound, totalRounds, isMultiplayer, broadcastGameState, playRoundStart]);
 
+  const submitAnswers = useCallback(() => {
+    if (hasSubmitted) return;
+    
+    setHasSubmitted(true);
+    
+    if (!isMultiplayer) {
+      // Solo game - go straight to results
+      const playerResult: PlayerResult = {
+        playerId,
+        name: currentPlayer?.name || "You",
+        letter,
+        answers,
+      };
+      setResults({ [playerId]: playerResult });
+      setPhase("results");
+      setShowResults(true);
+      return;
+    }
+
+    // Multiplayer - submit answers
+    if (channelRef.current) {
+      const playerResult: PlayerResult = {
+        playerId,
+        name: currentPlayer?.name || "Player",
+        letter,
+        answers,
+      };
+      
+      channelRef.current.send({
+        type: "broadcast",
+        event: "submit_answers",
+        payload: playerResult,
+      });
+    }
+  }, [hasSubmitted, isMultiplayer, playerId, currentPlayer?.name, letter, answers]);
+
+  const forceSubmitAll = useCallback(() => {
+    if (!isHost) return;
+    
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: "broadcast",
+        event: "force_submit_all",
+      });
+    }
+    
+    handleTimeUp();
+  }, [isHost, handleTimeUp]);
+
   const handleTimeUp = useCallback(() => {
+    setHasSubmitted(false); // Reset for next round
+    
     if (!isMultiplayer) {
       // Solo game - go straight to results
       const playerResult: PlayerResult = {
@@ -379,6 +439,7 @@ const Game = () => {
     } else {
       setCurrentRound(prev => prev + 1);
       setShowResults(false);
+      setHasSubmitted(false); // Reset for next round
       startRound();
     }
   }, [currentRound, totalRounds, players, scores, isMultiplayer, broadcastGameState, playWin, startRound]);
@@ -742,9 +803,30 @@ const Game = () => {
                             onChange={(e) => setAnswers(prev => ({ ...prev, [index]: e.target.value }))}
                             placeholder={`Something that starts with "${letter}"`}
                             className="glass-card"
+                            disabled={hasSubmitted}
                           />
                         </div>
                       ))}
+                    </div>
+                    
+                    <div className="flex gap-3 mt-6">
+                      <Button
+                        onClick={submitAnswers}
+                        disabled={hasSubmitted}
+                        className="flex-1 glass-card hover:scale-105"
+                      >
+                        {hasSubmitted ? "Submitted!" : "Submit Answers"}
+                      </Button>
+                      
+                      {isHost && isMultiplayer && (
+                        <Button
+                          onClick={forceSubmitAll}
+                          variant="outline"
+                          className="glass-card hover:scale-105"
+                        >
+                          Force Submit All
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

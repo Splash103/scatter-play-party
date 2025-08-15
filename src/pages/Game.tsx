@@ -1061,7 +1061,7 @@ export default function Game() {
 
         {/* Settings Dialog */}
         <Dialog open={showSettings} onOpenChange={setShowSettings}>
-          <DialogContent className="glass-panel border-0 max-w-2xl">
+          <DialogContent className="glass-panel border-0 max-w-xl">
             <DialogHeader>
               <DialogTitle>Game Settings</DialogTitle>
               <DialogDescription>Customize your game experience</DialogDescription>

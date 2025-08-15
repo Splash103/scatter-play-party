@@ -122,12 +122,20 @@ export function ResultsOverlay({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-6xl glass-panel border-0">
+      <DialogContent className="max-w-4xl glass-panel border-0">
         <DialogHeader className="sm:flex sm:items-center sm:justify-between">
           <DialogTitle className="text-3xl font-bold bg-gradient-to-r from-primary via-blue-600 to-purple-600 bg-clip-text text-transparent">
             Round Results
           </DialogTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+              className="glass-card hover:scale-105"
+            >
+              Exit Voting
+            </Button>
             <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
             <span className="text-sm text-muted-foreground font-medium">
               Voting ends in {voteTimeLeft}s
@@ -149,7 +157,7 @@ export function ResultsOverlay({
                 <Carousel setApi={setCarouselApi} opts={{ align: "center", loop: true }}>
                   <CarouselContent>
                     {entries.map((r) => (
-                      <CarouselItem key={r.playerId} className="md:basis-4/5 lg:basis-3/4 xl:basis-2/3">
+                      <CarouselItem key={r.playerId} className="md:basis-3/4 lg:basis-2/3 xl:basis-1/2">
                         <PlayerResultCard
                           r={r}
                           categories={categories}

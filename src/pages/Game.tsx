@@ -180,7 +180,6 @@ export default function Game() {
   const [currentRound, setCurrentRound] = useState(0);
   const [roundData, setRoundData] = useState<RoundData | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [votingTimeLeft, setVotingTimeLeft] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [earlySubmitCount, setEarlySubmitCount] = useState(0);
@@ -200,13 +199,6 @@ export default function Game() {
   const [votes, setVotes] = useState<Record<string, string[]>>({});
   const [results, setResults] = useState<Record<string, any>>({});
   const [finalSummary, setFinalSummary] = useState<FinalSummary | null>(null);
-  
-  // Rock Paper Scissors state
-  const [showRockPaperScissors, setShowRockPaperScissors] = useState(false);
-  const [rpsChoices, setRpsChoices] = useState<Record<string, string>>({});
-  const [rpsResults, setRpsResults] = useState<string | null>(null);
-  const [tiedPlayers, setTiedPlayers] = useState<Player[]>([]);
-  const [matchWinner, setMatchWinner] = useState<{ id: string; name: string } | null>(null);
   
   // Refs and hooks
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -325,28 +317,6 @@ export default function Game() {
         setShowFinalResults(true);
         playWin();
       })
-      .on("broadcast", { event: "stop_round" }, () => {
-        endRound();
-      })
-      .on("broadcast", { event: "rps_choice" }, ({ payload }) => {
-        setRpsChoices(prev => ({ ...prev, [payload.playerId]: payload.choice }));
-      })
-      .on("broadcast", { event: "rps_results" }, ({ payload }) => {
-        setRpsResults(payload.winner);
-        setTimeout(() => {
-          setShowRockPaperScissors(false);
-          setRpsChoices({});
-          setRpsResults(null);
-          // Update final summary with tiebreaker winner
-          if (finalSummary) {
-            const updatedSummary = {
-              ...finalSummary,
-              winners: [{ id: payload.winnerId, name: payload.winner, total: finalSummary.winners[0].total }]
-            };
-            setFinalSummary(updatedSummary);
-          }
-        }, 3000);
-      })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           await channel.track({
@@ -368,7 +338,6 @@ export default function Game() {
     if (payload.currentRound !== undefined) setCurrentRound(payload.currentRound);
     if (payload.roundData) setRoundData(payload.roundData);
     if (payload.timeLeft !== undefined) setTimeLeft(payload.timeLeft);
-    if (payload.votingTimeLeft !== undefined) setVotingTimeLeft(payload.votingTimeLeft);
     if (payload.isPaused !== undefined) setIsPaused(payload.isPaused);
     if (payload.earlySubmitCount !== undefined) setEarlySubmitCount(payload.earlySubmitCount);
     if (payload.showResults !== undefined) setShowResults(payload.showResults);
@@ -437,7 +406,6 @@ export default function Game() {
 
     setRoundData(newRoundData);
     setTimeLeft(settings.roundTime);
-    setVotingTimeLeft(0);
     setGamePhase("playing");
     setShowResults(false);
     setEarlySubmitCount(0);
@@ -450,7 +418,6 @@ export default function Game() {
         phase: "playing",
         roundData: newRoundData,
         timeLeft: settings.roundTime,
-        votingTimeLeft: 0,
         currentRound: currentRound + 1,
         showResults: false,
         earlySubmitCount: 0
@@ -490,19 +457,6 @@ export default function Game() {
     }, 1000);
   };
 
-  // Voting timer
-  useEffect(() => {
-    if (gamePhase === "voting" && votingTimeLeft > 0) {
-      const timer = setTimeout(() => {
-        setVotingTimeLeft(prev => prev - 1);
-      }, 1000);
-      return () => clearTimeout(timer);
-    } else if (gamePhase === "voting" && votingTimeLeft === 0) {
-      // Voting time ended, show results
-      showRoundResults();
-    }
-  }, [votingTimeLeft, gamePhase]);
-
   const pauseTimer = () => {
     if (!isHost) return;
     setIsPaused(true);
@@ -527,16 +481,6 @@ export default function Game() {
   const stopRound = () => {
     if (!isHost) return;
     setShowStopDialog(false);
-    
-    // Broadcast stop round to all players
-    if (isMultiplayer) {
-      channelRef.current?.send({
-        type: "broadcast",
-        event: "stop_round",
-        payload: {}
-      });
-    }
-    
     endRound();
   };
 
@@ -545,9 +489,6 @@ export default function Game() {
     
     setRoundData(prev => prev ? { ...prev, submitted: true, submittedAt: Date.now() } : null);
     setEarlySubmitCount(prev => prev + 1);
-    
-    // Show voting screen immediately when submitting early
-    setShowResults(true);
     
     if (isMultiplayer) {
       broadcastGameState({ earlySubmitCount: earlySubmitCount + 1 });
@@ -565,19 +506,13 @@ export default function Game() {
       timerRef.current = null;
     }
 
+    setGamePhase("results");
     setShowResults(true);
     
     if (isMultiplayer && isHost) {
       // Collect all results and broadcast
       const roundResults = {
-        results: Object.fromEntries(
-          players.map(p => [p.id, {
-            playerId: p.id,
-            name: p.name,
-            letter: roundData?.letter || null,
-            answers: roundData?.answers || {}
-          }])
-        ),
+        results: { [playerId]: roundData },
         votes: votes
       };
       
@@ -591,98 +526,6 @@ export default function Game() {
     // Check if game should end
     if (currentRound >= settings.maxRounds) {
       setTimeout(() => endGame(), 3000);
-    } else {
-      // Move to next round after delay
-      setTimeout(() => {
-        if (isHost) {
-          nextRound();
-        }
-      }, 5000);
-    }
-  };
-
-  const showRoundResults = () => {
-    // Calculate scores and determine round winner
-    const scores = calculateRoundScores();
-    
-    // Check if this was the final round
-    if (currentRound >= settings.maxRounds) {
-      // Final round - show final results
-      showFinalResults(scores);
-    } else {
-      // Move to next round after a brief delay
-      setTimeout(() => {
-        startNextRound();
-      }, 3000);
-    }
-  };
-
-  const calculateRoundScores = () => {
-    const scores: Record<string, number> = {};
-    
-    Object.values(results).forEach(result => {
-      const score = scoreFor(result);
-      scores[result.playerId] = (scores[result.playerId] || 0) + score;
-    });
-    
-    return scores;
-  };
-
-  const showFinalResults = async (finalScores: Record<string, number>) => {
-    // Find the highest score
-    const maxScore = Math.max(...Object.values(finalScores));
-    const winners = Object.entries(finalScores)
-      .filter(([_, score]) => score === maxScore)
-      .map(([playerId, score]) => ({
-        id: playerId,
-        name: players.find(p => p.id === playerId)?.name || "Player",
-        score
-      }));
-
-    if (winners.length === 1) {
-      // Single winner
-      const winner = winners[0];
-      setMatchWinner(winner);
-      await recordWin(winner.id);
-      setGamePhase("final");
-    } else {
-      // Tie - need rock paper scissors
-      setTiedPlayers(winners.map(w => ({ id: w.id, name: w.name })));
-      setGamePhase("rps");
-    }
-  };
-
-  const recordWin = async (winnerId: string) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return; // Only record wins for authenticated users
-      
-      // Check if the winner is the current authenticated user
-      const winnerPlayer = players.find(p => p.id === winnerId);
-      if (!winnerPlayer || winnerPlayer.id !== playerId) return;
-      
-      // Record the win in the database
-      const { error } = await supabase
-        .from('match_wins')
-        .insert({
-          user_id: user.id,
-          match_id: `${roomCode}-${Date.now()}` // Simple match ID
-        });
-        
-      if (error) {
-        console.error('Error recording win:', error);
-      } else {
-        // Update profile streak
-        const { error: profileError } = await supabase.rpc('update_win_streak', {
-          user_id: user.id
-        });
-        
-        if (profileError) {
-          console.error('Error updating streak:', profileError);
-        }
-      }
-    } catch (error) {
-      console.error('Error in recordWin:', error);
     }
   };
 
@@ -701,19 +544,7 @@ export default function Game() {
       return acc;
     }, {} as Record<string, number>);
 
-    const maxScore = Math.max(...players.map(p => p.score || 0));
-    const potentialWinners = players
-      .filter(p => p.score === maxScore);
-
-    // Check for ties
-    if (potentialWinners.length > 1 && isMultiplayer) {
-      // Start rock paper scissors tiebreaker
-      setTiedPlayers(potentialWinners);
-      setShowRockPaperScissors(true);
-      return;
-    }
-
-    const winners = potentialWinners
+    const winners = players
       .filter(p => p.score === Math.max(...players.map(p => p.score || 0)))
       .map(p => ({ id: p.id, name: p.name, total: p.score || 0 }));
 
@@ -735,46 +566,6 @@ export default function Game() {
     }
 
     playWin();
-  };
-
-  const startNextRound = () => {
-    const nextRound = currentRound + 1;
-    setCurrentRound(nextRound);
-    setGamePhase("playing");
-    setTimeLeft(settings.roundTime);
-    setVotingTimeLeft(0);
-    setRoundData(null);
-    setResults({});
-    setVotes({});
-    setShowResults(false);
-    setEarlySubmitCount(0);
-    
-    // Generate new round data
-    const categoryList = CATEGORY_LISTS.find(l => l.id === settings.categoryList) || generateRandomList();
-    const letter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
-    
-    const newRoundData: RoundData = {
-      letter,
-      categories: categoryList.categories.slice(0, 12),
-      answers: {},
-      submitted: false
-    };
-    
-    setRoundData(newRoundData);
-    
-    if (isMultiplayer) {
-      broadcastGameState({
-        phase: "playing",
-        roundData: newRoundData,
-        timeLeft: settings.roundTime,
-        votingTimeLeft: 0,
-        currentRound: nextRound,
-        showResults: false,
-        earlySubmitCount: 0
-      });
-    }
-    
-    startTimer();
   };
 
   const usePowerUp = (powerUpId: string) => {
@@ -836,71 +627,6 @@ export default function Game() {
     const categoryAnswers = answers[category] || ["Answer"];
     const validAnswers = categoryAnswers.filter(a => a.startsWith(letter));
     return validAnswers[Math.floor(Math.random() * validAnswers.length)] || `${letter}...`;
-  };
-
-  const makeRpsChoice = (choice: string) => {
-    if (!channelRef.current) return;
-    
-    channelRef.current.send({
-      type: "broadcast",
-      event: "rps_choice",
-      payload: { playerId, choice }
-    });
-    
-    setRpsChoices(prev => ({ ...prev, [playerId]: choice }));
-    
-    // Check if all tied players have made choices
-    const allChoices = { ...rpsChoices, [playerId]: choice };
-    if (Object.keys(allChoices).length === tiedPlayers.length && isHost) {
-      // Determine winner
-      const choices = Object.entries(allChoices);
-      const winner = determineRpsWinner(choices);
-      
-      channelRef.current.send({
-        type: "broadcast",
-        event: "rps_results",
-        payload: { 
-          winner: winner.name,
-          winnerId: winner.id
-        }
-      });
-      
-      setRpsResults(winner.name);
-    }
-  };
-  
-  const determineRpsWinner = (choices: [string, string][]): { id: string; name: string } => {
-    // Simple rock paper scissors logic for 2+ players
-    const playerChoices = choices.map(([id, choice]) => ({ 
-      id, 
-      choice, 
-      name: players.find(p => p.id === id)?.name || "Player" 
-    }));
-    
-    // For simplicity, if all choices are the same, pick random
-    const uniqueChoices = [...new Set(playerChoices.map(p => p.choice))];
-    if (uniqueChoices.length === 1) {
-      const randomIndex = Math.floor(Math.random() * playerChoices.length);
-      return { id: playerChoices[randomIndex].id, name: playerChoices[randomIndex].name };
-    }
-    
-    // Standard RPS logic for 2 players, or pick winner based on choice priority
-    if (uniqueChoices.includes("rock") && uniqueChoices.includes("scissors")) {
-      const winner = playerChoices.find(p => p.choice === "rock");
-      return { id: winner!.id, name: winner!.name };
-    }
-    if (uniqueChoices.includes("paper") && uniqueChoices.includes("rock")) {
-      const winner = playerChoices.find(p => p.choice === "paper");
-      return { id: winner!.id, name: winner!.name };
-    }
-    if (uniqueChoices.includes("scissors") && uniqueChoices.includes("paper")) {
-      const winner = playerChoices.find(p => p.choice === "scissors");
-      return { id: winner!.id, name: winner!.name };
-    }
-    
-    // Fallback to random
-    const randomIndex = Math.floor(Math.random() * playerChoices.length);
-    return { id: playerChoices[randomIndex].id, name: playerChoices[randomIndex].name };
   };
 
   const copyRoomCode = async () => {
@@ -1047,24 +773,12 @@ export default function Game() {
       </div>
 
       {/* Chat Panel */}
-        {/* Round Transition */}
-        {showRoundTransition && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="glass-panel p-8 text-center animate-scale-in">
-              <h2 className="text-4xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent mb-4">
-                {transitionText}
-              </h2>
-              <div className="w-16 h-16 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          </div>
-        )}
-
       {isMultiplayer && (
         <div className="space-y-6">
           <ChatPanel
             messages={chatMessages}
             onSend={sendChatMessage}
-            hostId={roomCreatorId}
+            currentName={playerName}
             hostId={players.find(p => p.isHost)?.id}
             streaks={players.reduce((acc, p) => ({ ...acc, [p.id]: p.streak || 0 }), {})}
           />
@@ -1095,7 +809,7 @@ export default function Game() {
                     <div className="text-sm text-muted-foreground mt-1">Letter</div>
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold">Round {currentRound + 1}/{settings.maxRounds}</h2>
+                    <h2 className="text-2xl font-bold">Round {currentRound + 1}</h2>
                     <p className="text-muted-foreground">Find words starting with "{roundData.letter}"</p>
                   </div>
                 </div>
@@ -1285,34 +999,20 @@ export default function Game() {
     );
   };
 
-  const renderVotingScreen = () => {
-    if (!showResults || !roundData) return null;
-
-    // Create mock results for all players with their current answers
-    const mockResults = Object.fromEntries(
-      players.map(p => [p.id, {
-        playerId: p.id,
-        name: p.name,
-        letter: roundData.letter,
-        answers: p.id === playerId ? roundData.answers : {} // Only show current player's answers for now
-      }])
-    );
-
-    return (
-      <ResultsOverlay
-        open={showResults}
-        onClose={() => setShowResults(false)}
-        results={mockResults}
-        presentCount={players.length}
-        votes={votes}
-        onVote={vote}
-        categories={roundData.categories}
-        localPlayerId={playerId}
-        voteTimeLeft={votingTimeLeft}
-        players={players}
-      />
-    );
-  };
+  const renderResults = () => (
+    <ResultsOverlay
+      open={showResults}
+      onClose={() => setShowResults(false)}
+      results={results}
+      presentCount={players.length}
+      votes={votes}
+      onVote={vote}
+      categories={roundData?.categories || []}
+      localPlayerId={playerId}
+      voteTimeLeft={Math.max(0, timeLeft)}
+      players={players}
+    />
+  );
 
   return (
     <>
@@ -1333,12 +1033,12 @@ export default function Game() {
         <div className="relative z-10 container py-8">
           {gamePhase === "lobby" && renderLobby()}
           {gamePhase === "playing" && renderGame()}
-          {renderVotingScreen()}
+          {gamePhase === "results" && renderResults()}
         </div>
 
         {/* Settings Dialog */}
         <Dialog open={showSettings} onOpenChange={setShowSettings}>
-          <DialogContent className="glass-panel border-0 max-w-xl">
+          <DialogContent className="glass-panel border-0 max-w-2xl">
             <DialogHeader>
               <DialogTitle>Game Settings</DialogTitle>
               <DialogDescription>Customize your game experience</DialogDescription>
@@ -1365,7 +1065,6 @@ export default function Game() {
                         <SelectItem value="120">2 minutes</SelectItem>
                         <SelectItem value="180">3 minutes</SelectItem>
                         <SelectItem value="300">5 minutes</SelectItem>
-                       <SelectItem value="30">30 seconds</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1526,67 +1225,6 @@ export default function Game() {
           />
         )}
       </div>
-
-      {/* Rock Paper Scissors Tiebreaker */}
-      <Dialog open={showRockPaperScissors} onOpenChange={() => {}}>
-        <DialogContent className="glass-panel border-0 max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-2xl text-center mb-4 flex items-center justify-center gap-2">
-              <Trophy className="w-6 h-6 text-yellow-500" />
-              Tiebreaker!
-            </DialogTitle>
-            <DialogDescription className="text-center">
-              {rpsResults ? (
-                <span className="text-lg font-medium text-green-600">
-                  🎉 {rpsResults} wins the tiebreaker!
-                </span>
-              ) : (
-                <>
-                  Multiple players tied! Choose your move:
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    Tied players: {tiedPlayers.map(p => p.name).join(", ")}
-                  </div>
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {!rpsResults && tiedPlayers.some(p => p.id === playerId) && (
-            <div className="grid grid-cols-3 gap-4 mt-6">
-              <Button
-                onClick={() => makeRpsChoice("rock")}
-                disabled={!!rpsChoices[playerId]}
-                className="glass-card hover:scale-105 h-20 flex-col"
-              >
-                <span className="text-2xl mb-1">🪨</span>
-                <span>Rock</span>
-              </Button>
-              <Button
-                onClick={() => makeRpsChoice("paper")}
-                disabled={!!rpsChoices[playerId]}
-                className="glass-card hover:scale-105 h-20 flex-col"
-              >
-                <span className="text-2xl mb-1">📄</span>
-                <span>Paper</span>
-              </Button>
-              <Button
-                onClick={() => makeRpsChoice("scissors")}
-                disabled={!!rpsChoices[playerId]}
-                className="glass-card hover:scale-105 h-20 flex-col"
-              >
-                <span className="text-2xl mb-1">✂️</span>
-                <span>Scissors</span>
-              </Button>
-            </div>
-          )}
-          
-          {!rpsResults && (
-            <div className="mt-4 text-center text-sm text-muted-foreground">
-              Choices made: {Object.keys(rpsChoices).length}/{tiedPlayers.length}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

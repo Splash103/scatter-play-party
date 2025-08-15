@@ -201,6 +201,7 @@ export default function Game() {
   const [finalSummary, setFinalSummary] = useState<FinalSummary | null>(null);
   const [resultsOpen, setResultsOpen] = useState(false);
   const [showRoundTransition, setShowRoundTransition] = useState(false);
+  const [roomCreatorId, setRoomCreatorId] = useState<string | null>(null);
   
   // Rock Paper Scissors state
   const [showRockPaperScissors, setShowRockPaperScissors] = useState(false);

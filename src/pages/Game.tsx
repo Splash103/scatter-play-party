@@ -578,7 +578,7 @@ const Game = () => {
                     {(!isMultiplayer || isHost) && (
                       <Button
                         onClick={startRound}
-                        disabled={isMultiplayer && players.length < 2}
+                       disabled={isMultiplayer && players.length < 1}
                         className="w-full glass-card hover:scale-105 h-12 text-lg"
                       >
                         <Play className="w-5 h-5 mr-2" />

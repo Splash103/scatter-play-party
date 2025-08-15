@@ -55,7 +55,7 @@ const Game = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const roomCode = searchParams.get("room")?.toUpperCase() || "";
-  const isHost = !roomCode;
+  const isHost = !roomCode || hostId === playerId;
   
   // Player state
   const [playerName, setPlayerName] = useState(() => localStorage.getItem("profileName") || "");
@@ -157,7 +157,7 @@ const Game = () => {
 
   // Game logic
   const startRound = useCallback(() => {
-    if (!isHost) return;
+    if (!isPlayerHost) return;
     
     const newLetter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
     const newCategories = selectedList.categories.slice(0, 12);
@@ -178,7 +178,7 @@ const Game = () => {
       event: "round_start",
       payload: { letter: newLetter, categories: newCategories, round: currentRound }
     });
-  }, [isHost, selectedList, currentRound, playRoundStart, startTimer]);
+  }, [isPlayerHost, selectedList, currentRound, playRoundStart, startTimer]);
 
   const submitAnswers = useCallback(() => {
     if (!channelRef.current) return;

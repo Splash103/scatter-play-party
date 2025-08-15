@@ -159,21 +159,21 @@ const Lobby = () => {
                     {filteredRooms.map((room) => (
                       <Card
                         key={room.code}
-                        className="group glass-card card-stack transition-all duration-300 hover:shadow-lg hover:border-primary/20"
+                        className="group glass-card transition-all duration-300 hover:shadow-xl hover:border-primary/30 hover:-translate-y-1 border-2"
                       >
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="font-mono">
+                        <CardContent className="p-5">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <Badge variant="outline" className="font-mono text-sm font-bold px-3 py-1 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-300/50">
                                 {room.code}
                               </Badge>
                               {room.inMatch ? (
-                                <Badge variant="secondary" className="text-xs">
+                                <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
                                   <Clock className="w-3 h-3 mr-1" />
                                   In Progress
                                 </Badge>
                               ) : (
-                                <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                <Badge className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-green-300">
                                   <UserPlus className="w-3 h-3 mr-1" />
                                   Open
                                 </Badge>
@@ -184,40 +184,45 @@ const Lobby = () => {
                             </div>
                           </div>
                           
-                          <div className="mb-3">
-                            <h3 className="font-medium text-base mb-1 group-hover:text-primary transition-colors">
+                          <div className="mb-4">
+                            <h3 className="font-semibold text-lg mb-2 group-hover:text-primary transition-colors">
                               {room.name}
                             </h3>
                             {room.hostName && (
-                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Crown className="w-3 h-3" />
-                                <span>Hosted by {room.hostName}</span>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-full px-3 py-1">
+                                <Crown className="w-3 h-3 text-yellow-600" />
+                                <span className="font-medium">Hosted by {room.hostName}</span>
                               </div>
                             )}
                           </div>
 
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Avatar className="w-6 h-6 border">
+                          <div className="flex items-center justify-between pt-3 border-t border-border/50">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="w-8 h-8 border-2 border-white/20 shadow-sm">
                                 <AvatarFallback 
                                   style={{ 
                                     backgroundImage: gradientFromString(room.hostName || room.code), 
                                     color: "white",
-                                    fontSize: "10px"
+                                    fontSize: "12px"
                                   }}
                                 >
                                   {initialsFromName(room.hostName || room.code)}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="text-sm text-muted-foreground">
-                                {room.players}/{room.maxPlayers} players
-                              </span>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium">
+                                  {room.players}/{room.maxPlayers} players
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {room.players === 1 ? '1 player' : `${room.players} players`} online
+                                </span>
+                              </div>
                             </div>
                             <Button 
-                              size="sm" 
+                              size="sm"
                               onClick={() => join(room.code)}
                               disabled={room.players >= room.maxPlayers}
-                              className="glass-card hover:scale-105"
+                              className="glass-card hover:scale-105 px-4 py-2 font-medium shadow-sm"
                             >
                               {room.players >= room.maxPlayers ? "Full" : "Join"}
                             </Button>

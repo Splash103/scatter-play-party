@@ -78,6 +78,7 @@ const Game = () => {
   const [letter, setLetter] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedList, setSelectedList] = useState<CategoryList>(CATEGORY_LISTS[0]);
+  const [voteTime, setVoteTime] = useState(30);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [results, setResults] = useState<Record<string, PlayerResult>>({});
   const [votes, setVotes] = useState<Record<string, string[]>>({});
@@ -198,9 +199,16 @@ const Game = () => {
       event: "answers_submitted",
       payload: playerResult
     });
-    
-    setPhase("voting");
   }, [playerId, playerName, letter, answers]);
+
+  // Check if all players have submitted and transition to voting
+  useEffect(() => {
+    if (phase === "playing" && Object.keys(results).length === presentPlayers.length && presentPlayers.length > 0) {
+      setPhase("voting");
+      setShowResults(true);
+      startTimer(voteTime);
+    }
+  }, [results, presentPlayers.length, phase, voteTime, startTimer]);
 
   const vote = useCallback((voteKey: string) => {
     if (!channelRef.current) return;
@@ -213,6 +221,83 @@ const Game = () => {
     });
   }, [playerId, playVote]);
 
+  // Calculate scores and handle round end
+  const calculateScores = useCallback(() => {
+    const newScores = { ...scores };
+    const newStreaks = { ...streaks };
+    
+    Object.values(results).forEach(result => {
+      let roundScore = 0;
+      const ltr = (result.letter || '').toUpperCase();
+      
+      for (const idx in result.answers) {
+        const i = Number(idx);
+        const val = result.answers[i];
+        if (!val || !val.trim()) continue;
+        
+        const key = `${result.playerId}:${i}`;
+        const majority = Math.floor(presentPlayers.length / 2) + 1;
+        const isDisqualified = (votes[key]?.length || 0) >= majority;
+        const startsOk = ltr && val.trimStart().charAt(0).toUpperCase() === ltr;
+        
+        if (isDisqualified) {
+          roundScore -= 1;
+        } else if (startsOk) {
+          roundScore += 1;
+          // Check for alliteration bonus
+          const words = val.trim().split(/\s+/);
+          const alliterationCount = words.filter(w => w.charAt(0).toUpperCase() === ltr).length;
+          if (alliterationCount >= 2) {
+            roundScore += 1;
+          }
+        }
+      }
+      
+      newScores[result.playerId] = (newScores[result.playerId] || 0) + Math.max(0, roundScore);
+      
+      // Update streaks
+      if (roundScore > 0) {
+        newStreaks[result.playerId] = (newStreaks[result.playerId] || 0) + 1;
+      } else {
+        newStreaks[result.playerId] = 0;
+      }
+    });
+    
+    setScores(newScores);
+    setStreaks(newStreaks);
+    
+    // Check if game is complete
+    if (currentRound >= totalRounds) {
+      // Game complete - show final scoreboard
+      const playerList = presentPlayers.map(p => ({ id: p.id, name: p.name }));
+      const winners = Object.entries(newScores)
+        .sort(([,a], [,b]) => b - a)
+        .filter(([,score]) => score === Math.max(...Object.values(newScores)))
+        .map(([id]) => ({ 
+          id, 
+          name: playerList.find(p => p.id === id)?.name || "Player",
+          total: newScores[id] 
+        }));
+      
+      setFinalSummary({
+        totals: newScores,
+        winners,
+        players: playerList
+      });
+      setPhase("final");
+      setShowFinal(true);
+      playWin();
+    } else {
+      // Next round
+      setTimeout(() => {
+        setCurrentRound(prev => prev + 1);
+        setPhase("lobby");
+        setResults({});
+        setVotes({});
+        setShowResults(false);
+      }, 3000);
+    }
+  }, [scores, streaks, results, votes, presentPlayers, currentRound, totalRounds, playWin]);
   // Supabase channel setup
   useEffect(() => {
     if (!roomCode || !playerName) return;
@@ -252,6 +337,21 @@ const Game = () => {
       .on("broadcast", { event: "answers_submitted" }, ({ payload }) => {
         setResults(prev => ({ ...prev, [payload.playerId]: payload }));
       })
+      .on("broadcast", { event: "force_end_round" }, ({ payload }) => {
+        if (payload.phase === "playing") {
+          // Auto-submit for everyone who hasn't submitted
+          const playerResult: PlayerResult = {
+            playerId,
+            name: playerName,
+            letter,
+            answers
+          };
+          setResults(prev => ({ ...prev, [playerId]: playerResult }));
+        } else if (payload.phase === "voting") {
+          setPhase("results");
+          setShowResults(false);
+        }
+      })
       .on("broadcast", { event: "vote_cast" }, ({ payload }) => {
         setVotes(prev => ({
           ...prev,
@@ -282,28 +382,40 @@ const Game = () => {
     }
     if (timeLeft === 0 && phase === "voting") {
       setPhase("results");
-      setShowResults(true);
+      setShowResults(false);
+      calculateScores();
     }
-  }, [timeLeft, phase, submitAnswers]);
+  }, [timeLeft, phase, submitAnswers, calculateScores]);
+
+  // Handle results phase transition
+  useEffect(() => {
+    if (phase === "results") {
+      const timer = setTimeout(() => {
+        calculateScores();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [phase, calculateScores]);
 
   // Force end round (host only)
   const forceEndRound = useCallback(() => {
     if (!isPlayerHost) return;
     
     if (phase === "playing") {
-      submitAnswers();
+      // Force submit for all players
+      channelRef.current?.send({
+        type: "broadcast",
+        event: "force_end_round",
+        payload: { phase: "playing" }
+      });
     } else if (phase === "voting") {
-      setPhase("results");
-      setShowResults(true);
+      channelRef.current?.send({
+        type: "broadcast",
+        event: "force_end_round", 
+        payload: { phase: "voting" }
+      });
     }
-    
-    // Broadcast to room
-    channelRef.current?.send({
-      type: "broadcast",
-      event: "force_end_round",
-      payload: { phase }
-    });
-  }, [isPlayerHost, phase, submitAnswers]);
+  }, [isPlayerHost, phase]);
 
   // Cleanup
   useEffect(() => {
@@ -598,6 +710,26 @@ const Game = () => {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Results Phase */}
+              {phase === "results" && (
+                <Card className="glass-panel">
+                  <CardHeader>
+                    <CardTitle>Round Complete!</CardTitle>
+                    <CardDescription>
+                      Calculating scores and preparing next round...
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center py-8">
+                      <div className="text-lg font-medium mb-2">Round {currentRound} Results</div>
+                      <div className="text-sm text-muted-foreground">
+                        {currentRound < totalRounds ? "Next round starting soon..." : "Preparing final results..."}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Sidebar */}
@@ -685,7 +817,7 @@ const Game = () => {
           onVote={vote}
           categories={categories}
           localPlayerId={playerId}
-          voteTimeLeft={timeLeft}
+          voteTimeLeft={phase === "voting" ? timeLeft : 0}
           players={presentPlayers}
         />
 
@@ -699,6 +831,10 @@ const Game = () => {
             setCurrentRound(1);
             setPhase("lobby");
             setShowFinal(false);
+            setResults({});
+            setVotes({});
+            setScores({});
+            setStreaks({});
           }}
         />
 
@@ -738,6 +874,21 @@ const Game = () => {
                     <option value={1}>1 Round</option>
                     <option value={3}>3 Rounds</option>
                     <option value={5}>5 Rounds</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Voting Time</label>
+                  <select
+                    value={voteTime}
+                    onChange={(e) => setVoteTime(Number(e.target.value))}
+                    className="w-full p-2 rounded-md border border-input bg-background glass-card"
+                    disabled={!isPlayerHost}
+                  >
+                    <option value={15}>15 seconds</option>
+                    <option value={30}>30 seconds</option>
+                    <option value={45}>45 seconds</option>
+                    <option value={60}>60 seconds</option>
                   </select>
                 </div>
               </div>

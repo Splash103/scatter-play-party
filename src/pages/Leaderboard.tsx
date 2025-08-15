@@ -73,7 +73,7 @@ export default function Leaderboard() {
           <div className="relative z-10 container py-8">
           <header className="mb-6 flex items-center justify-between">
             <h1 className="text-4xl font-bold tracking-tight text-white">
-              Champions Leaderboard
+              Leaderboard
             </h1>
           </header>
 

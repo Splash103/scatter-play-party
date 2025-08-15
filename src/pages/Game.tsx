@@ -112,6 +112,19 @@ const Game = () => {
     inMatch: phase !== "lobby",
   });
 
+  // Room setup - moved after all hooks
+  useEffect(() => {
+    if (!playerName.trim()) {
+      const name = prompt("Enter your name:");
+      if (!name?.trim()) {
+        navigate("/");
+        return;
+      }
+      setPlayerName(name.trim());
+      localStorage.setItem("profileName", name.trim());
+    }
+  }, [playerName, navigate]);
+
   // Copy room code
   const copyRoomCode = useCallback(async () => {
     if (!roomCode) return;
@@ -194,19 +207,6 @@ const Game = () => {
       payload: { voteKey, voterId: playerId }
     });
   }, [playerId, playVote]);
-
-  // Room setup
-  useEffect(() => {
-    if (!playerName.trim()) {
-      const name = prompt("Enter your name:");
-      if (!name?.trim()) {
-        navigate("/");
-        return;
-      }
-      setPlayerName(name.trim());
-      localStorage.setItem("profileName", name.trim());
-    }
-  }, [playerName, navigate]);
 
   // Supabase channel setup
   useEffect(() => {

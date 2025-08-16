@@ -1410,115 +1410,126 @@ export default function Game() {
                     </SelectTrigger>
                     <SelectContent>
                       {CATEGORY_LISTS.map(list => (
-                        <SelectItem key={list.id} value={list.id}>{list.name}</SelectItem>
+                        <SelectItem key={list.id} value={list.id}>
+                          {list.name}
+                        </SelectItem>
                       ))}
-                      <SelectItem value="random">Random Mix</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </TabsContent>
               
               <TabsContent value="gameplay" className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Allow Early Submit</Label>
-                    <p className="text-sm text-muted-foreground">Players can submit before time runs out</p>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Allow Early Submit</Label>
+                      <p className="text-sm text-muted-foreground">Players can submit before timer ends</p>
+                    </div>
+                    <Switch 
+                      checked={settings.allowEarlySubmit}
+                      onCheckedChange={(checked) => setSettings(prev => ({ ...prev, allowEarlySubmit: checked }))}
+                    />
                   </div>
-                  <Switch 
-                    checked={settings.allowEarlySubmit} 
-                    onCheckedChange={(v) => setSettings(prev => ({ ...prev, allowEarlySubmit: v }))} 
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Show Results At (seconds remaining)</Label>
-                  <Select value={settings.showResultsAt.toString()} onValueChange={(v) => setSettings(prev => ({ ...prev, showResultsAt: parseInt(v) }))}>
-                    <SelectTrigger className="glass-card">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="30">30 seconds</SelectItem>
-                      <SelectItem value="60">1 minute</SelectItem>
-                      <SelectItem value="90">1.5 minutes</SelectItem>
-                      <SelectItem value="120">2 minutes</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  
+                  <div className="space-y-2">
+                    <Label>Show Results At (seconds remaining)</Label>
+                    <Select value={settings.showResultsAt.toString()} onValueChange={(v) => setSettings(prev => ({ ...prev, showResultsAt: parseInt(v) }))}>
+                      <SelectTrigger className="glass-card">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">When timer ends</SelectItem>
+                        <SelectItem value="30">30 seconds</SelectItem>
+                        <SelectItem value="60">60 seconds</SelectItem>
+                        <SelectItem value="90">90 seconds</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </TabsContent>
               
               <TabsContent value="advanced" className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Enable Power-ups</Label>
-                    <p className="text-sm text-muted-foreground">Special abilities during gameplay</p>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Enable Power-ups</Label>
+                      <p className="text-sm text-muted-foreground">Special abilities during gameplay</p>
+                    </div>
+                    <Switch 
+                      checked={settings.enablePowerUps}
+                      onCheckedChange={(checked) => setSettings(prev => ({ ...prev, enablePowerUps: checked }))}
+                    />
                   </div>
-                  <Switch 
-                    checked={settings.enablePowerUps} 
-                    onCheckedChange={(v) => setSettings(prev => ({ ...prev, enablePowerUps: v }))} 
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Enable Achievements</Label>
-                    <p className="text-sm text-muted-foreground">Unlock achievements for special plays</p>
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Enable Achievements</Label>
+                      <p className="text-sm text-muted-foreground">Unlock rewards for performance</p>
+                    </div>
+                    <Switch 
+                      checked={settings.enableAchievements}
+                      onCheckedChange={(checked) => setSettings(prev => ({ ...prev, enableAchievements: checked }))}
+                    />
                   </div>
-                  <Switch 
-                    checked={settings.enableAchievements} 
-                    onCheckedChange={(v) => setSettings(prev => ({ ...prev, enableAchievements: v }))} 
-                  />
-                </div>
-                
-                {isMultiplayer && (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label>Public Room</Label>
-                        <p className="text-sm text-muted-foreground">Show room in public lobby</p>
+                  
+                  {isMultiplayer && (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label>Public Room</Label>
+                          <p className="text-sm text-muted-foreground">Others can discover and join</p>
+                        </div>
+                        <Switch 
+                          checked={settings.publicRoom}
+                          onCheckedChange={(checked) => setSettings(prev => ({ ...prev, publicRoom: checked }))}
+                        />
                       </div>
-                      <Switch 
-                        checked={settings.publicRoom} 
-                        onCheckedChange={(v) => setSettings(prev => ({ ...prev, publicRoom: v }))} 
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Max Players</Label>
-                      <Select value={settings.maxPlayers.toString()} onValueChange={(v) => setSettings(prev => ({ ...prev, maxPlayers: parseInt(v) }))}>
-                        <SelectTrigger className="glass-card">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="2">2 Players</SelectItem>
-                          <SelectItem value="4">4 Players</SelectItem>
-                          <SelectItem value="6">6 Players</SelectItem>
-                          <SelectItem value="8">8 Players</SelectItem>
-                          <SelectItem value="12">12 Players</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </>
-                )}
+                      
+                      <div className="space-y-2">
+                        <Label>Max Players</Label>
+                        <Select value={settings.maxPlayers.toString()} onValueChange={(v) => setSettings(prev => ({ ...prev, maxPlayers: parseInt(v) }))}>
+                          <SelectTrigger className="glass-card">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="2">2 Players</SelectItem>
+                            <SelectItem value="4">4 Players</SelectItem>
+                            <SelectItem value="6">6 Players</SelectItem>
+                            <SelectItem value="8">8 Players</SelectItem>
+                            <SelectItem value="12">12 Players</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
+                </div>
               </TabsContent>
             </Tabs>
+            
+            <DialogFooter>
+              <Button onClick={() => setShowSettings(false)} className="glass-card">
+                Save Settings
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        {/* Stop Round Dialog */}
+        {/* Stop Round Confirmation */}
         <AlertDialog open={showStopDialog} onOpenChange={setShowStopDialog}>
           <AlertDialogContent className="glass-panel border-0">
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-red-500" />
-                Stop Round Early?
+                <AlertTriangle className="w-5 h-5 text-yellow-500" />
+                Stop Current Round?
               </AlertDialogTitle>
               <AlertDialogDescription>
-                This will immediately end the current round and show results. This action cannot be undone.
+                This will immediately end the current round for all players. This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={stopRound} className="bg-red-600 hover:bg-red-700">
+              <AlertDialogCancel className="glass-card">Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={stopRound} className="glass-card bg-red-600 hover:bg-red-700">
                 Stop Round
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -1552,55 +1563,40 @@ export default function Game() {
               Tiebreaker!
             </DialogTitle>
             <DialogDescription className="text-center">
-              {rpsResults ? (
-                <span className="text-lg font-medium text-green-600">
-                  🎉 {rpsResults} wins the tiebreaker!
-                </span>
-              ) : (
-                <>
-                  Multiple players tied! Choose your move:
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    Tied players: {tiedPlayers.map(p => p.name).join(", ")}
-                  </div>
-                </>
-              )}
+              Multiple players tied! Choose your weapon:
             </DialogDescription>
           </DialogHeader>
           
-          {!rpsResults && tiedPlayers.some(p => p.id === playerId) && (
-            <div className="grid grid-cols-3 gap-4 mt-6">
-              <Button
-                onClick={() => makeRpsChoice("rock")}
-                disabled={!!rpsChoices[playerId]}
-                className="glass-card hover:scale-105 h-20 flex-col"
-              >
-                <span className="text-2xl mb-1">🪨</span>
-                <span>Rock</span>
-              </Button>
-              <Button
-                onClick={() => makeRpsChoice("paper")}
-                disabled={!!rpsChoices[playerId]}
-                className="glass-card hover:scale-105 h-20 flex-col"
-              >
-                <span className="text-2xl mb-1">📄</span>
-                <span>Paper</span>
-              </Button>
-              <Button
-                onClick={() => makeRpsChoice("scissors")}
-                disabled={!!rpsChoices[playerId]}
-                className="glass-card hover:scale-105 h-20 flex-col"
-              >
-                <span className="text-2xl mb-1">✂️</span>
-                <span>Scissors</span>
-              </Button>
+          {rpsResults ? (
+            <div className="text-center py-8">
+              <div className="text-4xl font-bold text-green-600 mb-2">
+                🎉 {rpsResults} Wins! 🎉
+              </div>
+              <p className="text-muted-foreground">Tiebreaker complete</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-4 py-4">
+              {["rock", "paper", "scissors"].map(choice => (
+                <Button
+                  key={choice}
+                  variant={rpsChoices[playerId] === choice ? "default" : "outline"}
+                  className="h-20 text-2xl glass-card"
+                  onClick={() => makeRpsChoice(choice)}
+                  disabled={!!rpsChoices[playerId]}
+                >
+                  {choice === "rock" && "🪨"}
+                  {choice === "paper" && "📄"}
+                  {choice === "scissors" && "✂️"}
+                  <br />
+                  <span className="text-sm capitalize">{choice}</span>
+                </Button>
+              ))}
             </div>
           )}
           
-          {!rpsResults && (
-            <div className="mt-4 text-center text-sm text-muted-foreground">
-              Choices made: {Object.keys(rpsChoices).length}/{tiedPlayers.length}
-            </div>
-          )}
+          <div className="text-center text-sm text-muted-foreground">
+            {Object.keys(rpsChoices).length}/{tiedPlayers.length} players have chosen
+          </div>
         </DialogContent>
       </Dialog>
     </>

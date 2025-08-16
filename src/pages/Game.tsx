@@ -55,7 +55,7 @@ import {
 } from "lucide-react";
 
 // Game state types
-type GamePhase = "lobby" | "playing" | "results" | "final";
+type GamePhase = "lobby" | "playing" | "results" | "final" | "voting" | "rps";
 type GameMode = "solo" | "multiplayer";
 
 interface Player {
@@ -203,7 +203,7 @@ export default function Game() {
   const [showRoundTransition, setShowRoundTransition] = useState(false);
   const [roomCreatorId, setRoomCreatorId] = useState<string | null>(null);
   const [finalScoreboardOpen, setFinalScoreboardOpen] = useState(false);
-  const [showFinalResults, setShowFinalResults] = useState(false);
+  const [showFinalResultsState, setShowFinalResultsState] = useState(false);
   const [transitionText, setTransitionText] = useState("");
   
   // Rock Paper Scissors state
@@ -327,7 +327,7 @@ export default function Game() {
       })
       .on("broadcast", { event: "final_results" }, ({ payload }) => {
         setFinalSummary(payload.summary);
-        setShowFinalResults(true);
+        setShowFinalResultsState(true);
         playWin();
       })
       .on("broadcast", { event: "stop_round" }, () => {
@@ -497,12 +497,12 @@ export default function Game() {
 
   // Voting timer
   useEffect(() => {
-    if (gamePhase === "voting" && votingTimeLeft > 0) {
+    if (gamePhase === "results" && votingTimeLeft > 0) {
       const timer = setTimeout(() => {
         setVotingTimeLeft(prev => prev - 1);
       }, 1000);
       return () => clearTimeout(timer);
-    } else if (gamePhase === "voting" && votingTimeLeft === 0) {
+    } else if (gamePhase === "results" && votingTimeLeft === 0) {
       // Voting time ended, show results
       showRoundResults();
     }
@@ -613,7 +613,7 @@ export default function Game() {
     // Check if this was the final round
     if (currentRound >= settings.maxRounds) {
       // Final round - show final results
-      showFinalResults(scores);
+      showMatchFinalResults(scores);
     } else {
       // Move to next round after a brief delay
       setTimeout(() => {
@@ -635,10 +635,11 @@ export default function Game() {
 
   const scoreFor = (result: any) => {
     // Simple scoring logic - 1 point per valid answer
-    return Object.values(result.answers || {}).filter(answer => answer && answer.length > 0).length;
+    const answers = result.answers || {};
+    return Object.values(answers).filter((answer: any) => answer && typeof answer === 'string' && answer.length > 0).length;
   };
 
-  const showFinalResults = async (finalScores: Record<string, number>) => {
+  const showMatchFinalResults = async (finalScores: Record<string, number>) => {
     setResultsOpen(false); // Stop the results timer loop
     // Find the highest score
     const maxScore = Math.max(...Object.values(finalScores));
@@ -676,20 +677,15 @@ export default function Game() {
       const { error } = await supabase
         .from('match_wins')
         .insert({
-          match_id: `${roomCode}-${Date.now()}` // Simple match ID
+          match_id: `${roomCode}-${Date.now()}`, // Simple match ID
+          user_id: user.id
         });
         
       if (error) {
         console.error('Error recording win:', error);
       } else {
-        // Update profile streak
-        const { error: profileError } = await supabase.rpc('update_win_streak', {
-          user_id: user.id
-        });
-        
-        if (profileError) {
-          console.error('Error updating streak:', profileError);
-        }
+        // Note: update_win_streak function would need to be created in Supabase
+        // For now, we'll just record the win
       }
     } catch (error) {
       console.error('Error in recordWin:', error);
@@ -744,7 +740,7 @@ export default function Game() {
     };
 
     setFinalSummary(summary);
-    setShowFinalResults(true);
+    setShowFinalResultsState(true);
 
     if (isMultiplayer && isHost) {
       channelRef.current?.send({
@@ -1084,6 +1080,7 @@ export default function Game() {
           <ChatPanel
             messages={chatMessages}
             onSend={sendChatMessage}
+            currentName={playerName}
             hostId={players.find(p => p.isHost)?.id}
             streaks={players.reduce((acc, p) => ({ ...acc, [p.id]: p.streak || 0 }), {})}
           />
@@ -1531,12 +1528,12 @@ export default function Game() {
         {/* Final Results */}
         {finalSummary && (
           <FinalScoreboard
-            open={showFinalResults}
-            onClose={() => setShowFinalResults(false)}
+            open={showFinalResultsState}
+            onClose={() => setShowFinalResultsState(false)}
             summary={finalSummary}
             isHost={isHost}
             onPlayAgain={() => {
-              setShowFinalResults(false);
+              setShowFinalResultsState(false);
               setGamePhase("lobby");
               setCurrentRound(0);
               // Reset player scores

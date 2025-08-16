@@ -91,6 +91,7 @@ interface GameSettings {
   maxRounds: number;
   allowEarlySubmit: boolean;
   showResultsAt: number; // seconds remaining when results show
+  votingTime: number; // seconds for voting phase
   enablePowerUps: boolean;
   enableAchievements: boolean;
   publicRoom: boolean;
@@ -107,11 +108,14 @@ interface RoundData {
 }
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+
 const DEFAULT_SETTINGS: GameSettings = {
   roundTime: 120,
   maxRounds: 3,
   allowEarlySubmit: true,
   showResultsAt: 60,
+  votingTime: 30,
   enablePowerUps: true,
   enableAchievements: true,
   publicRoom: false,
@@ -456,7 +460,7 @@ export default function Game() {
         roundData: newRoundData,
         timeLeft: settings.roundTime,
         votingTimeLeft: 0,
-        currentRound: currentRound + 1,
+        currentRound: currentRound,
         showResults: false,
         earlySubmitCount: 0
       });
@@ -571,6 +575,8 @@ export default function Game() {
     }
 
     setShowResults(true);
+    setGamePhase("results");
+    setVotingTimeLeft(settings.votingTime); // Use configured voting time
     
     if (isMultiplayer && isHost) {
       // Collect all results and broadcast
@@ -593,16 +599,16 @@ export default function Game() {
       });
     }
 
-    // Check if game should end
-    if (currentRound >= settings.maxRounds) {
+    // Check if game should end (currentRound is 0-indexed, so check >= maxRounds - 1)
+    if (currentRound >= settings.maxRounds - 1) {
       setTimeout(() => endGame(), 3000);
     } else {
-      // Move to next round after delay
+      // Move to next round after voting
       setTimeout(() => {
         if (isHost) {
           nextRound();
         }
-      }, 5000);
+      }, settings.votingTime * 1000); // Wait for voting to complete
     }
   };
 
@@ -610,8 +616,8 @@ export default function Game() {
     // Calculate scores and determine round winner
     const scores = calculateRoundScores();
     
-    // Check if this was the final round
-    if (currentRound >= settings.maxRounds) {
+    // Check if this was the final round (currentRound is 0-indexed)
+    if (currentRound >= settings.maxRounds - 1) {
       // Final round - show final results
       showMatchFinalResults(scores);
     } else {
@@ -704,7 +710,11 @@ export default function Game() {
 
   const nextRound = () => {
     if (!isHost) return;
-    setCurrentRound(prev => prev + 1);
+    const newRound = currentRound + 1;
+    setCurrentRound(newRound);
+    setGamePhase("playing");
+    setShowResults(false);
+    setVotingTimeLeft(0);
     startNewRound();
   };
 
@@ -794,7 +804,7 @@ export default function Game() {
   };
 
   const usePowerUp = (powerUpId: string) => {
-    if (!currentPlayer) return;
+    if (!currentPlayer || !settings.enablePowerUps) return;
     
     const powerUp = currentPlayer.powerUps?.find(p => p.id === powerUpId);
     if (!powerUp || powerUp.uses >= powerUp.maxUses) return;
@@ -802,12 +812,16 @@ export default function Game() {
     // Apply power-up effect
     switch (powerUp.type) {
       case "time_freeze":
-        pauseTimer();
-        setTimeout(() => resumeTimer(), 10000);
+        if (timeLeft > 0) {
+          pauseTimer();
+          setTimeout(() => resumeTimer(), 10000);
+          toast({ title: "Time Freeze!", description: "Timer paused for 10 seconds" });
+        }
         break;
       case "peek":
         setPeekMode(true);
         setTimeout(() => setPeekMode(false), 15000);
+        toast({ title: "Peek Mode!", description: "See other players' answers for 15 seconds" });
         break;
       case "lightning":
         if (roundData) {
@@ -818,8 +832,17 @@ export default function Game() {
               ...prev,
               answers: { ...prev.answers, [emptyIndex]: autoAnswer }
             } : null);
+            toast({ title: "Lightning Strike!", description: "Auto-filled an answer!" });
           }
         }
+        break;
+      case "double_points":
+        // This would need to be handled in scoring logic
+        toast({ title: "Double Points!", description: "Next round answers worth double!" });
+        break;
+      case "shield":
+        // This would protect from negative votes
+        toast({ title: "Shield Active!", description: "Protected from disqualifications!" });
         break;
     }
 
@@ -1144,6 +1167,14 @@ export default function Game() {
                       >
                         <StopCircle className="w-4 h-4" />
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => endGame()}
+                        className="glass-card text-yellow-600 hover:text-yellow-700"
+                      >
+                        End Game
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -1443,6 +1474,21 @@ export default function Game() {
                         <SelectItem value="30">30 seconds</SelectItem>
                         <SelectItem value="60">60 seconds</SelectItem>
                         <SelectItem value="90">90 seconds</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Voting Time (seconds)</Label>
+                    <Select value={settings.votingTime.toString()} onValueChange={(v) => setSettings(prev => ({ ...prev, votingTime: parseInt(v) }))}>
+                      <SelectTrigger className="glass-card">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="15">15 seconds</SelectItem>
+                        <SelectItem value="30">30 seconds</SelectItem>
+                        <SelectItem value="45">45 seconds</SelectItem>
+                        <SelectItem value="60">60 seconds</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

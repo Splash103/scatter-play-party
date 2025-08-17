@@ -36,7 +36,7 @@ export function ResultsOverlay({
   players,
 }: {
   open: boolean;
-  onClose: () => void;
+  onClose: (skipEarlyReturn?: boolean) => void;
   results: Record<string, PlayerResult>;
   presentCount: number;
   votes: Record<string, string[]>;
@@ -132,14 +132,14 @@ export function ResultsOverlay({
             <Button
               variant="outline"
               size="sm"
-              onClick={onClose}
+              onClick={() => onClose(false)}
               className="glass-card hover:scale-105"
             >
-              Exit Voting
+              Keep Viewing
             </Button>
             <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
             <span className="text-sm text-muted-foreground font-medium">
-              Voting ends in {voteTimeLeft}s
+              {voteTimeLeft > 0 ? `Voting ends in ${voteTimeLeft}s` : `Vote on answers to disqualify them`}
             </span>
           </div>
         </DialogHeader>

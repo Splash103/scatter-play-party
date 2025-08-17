@@ -302,13 +302,23 @@ export default function Game() {
         });
         setPlayers(playerList);
         
-        const hostPlayer = playerList.find(p => p.isHost);
+        // Store room creator to ensure only they are host
+        if (!roomCreatorId) {
+          const hostPlayer = playerList.find(p => p.isHost);
+          if (hostPlayer) {
+            setRoomCreatorId(hostPlayer.id);
+          } else if (playerList.length === 1) {
+            // First player becomes room creator and host
+            setRoomCreatorId(playerId);
+            setIsHost(true);
+          }
+        }
+        
         const currentPlayerData = playerList.find(p => p.id === playerId);
         if (currentPlayerData) {
           setCurrentPlayer(currentPlayerData);
-          setIsHost(currentPlayerData.isHost || false);
-        } else if (!hostPlayer && playerList.length > 0) {
-          setIsHost(true);
+          // Only room creator is host
+          setIsHost(roomCreatorId === playerId);
         }
       })
       .on("broadcast", { event: "game_state" }, ({ payload }) => {
@@ -337,6 +347,33 @@ export default function Game() {
       .on("broadcast", { event: "stop_round" }, () => {
         endRound();
       })
+      .on("broadcast", { event: "early_submit" }, ({ payload }) => {
+        toast({ 
+          title: "Early Submit", 
+          description: `${payload.playerName} submitted early!` 
+        });
+      })
+      .on("broadcast", { event: "force_submit_all" }, ({ payload }) => {
+        // All players must submit immediately when host forces
+        if (roundData && !roundData.submitted) {
+          setRoundData(prev => prev ? { ...prev, submitted: true } : null);
+          toast({ 
+            title: "Round Ended", 
+            description: "Host forced all players to submit!" 
+          });
+        }
+      })
+      .on("broadcast", { event: "return_to_lobby" }, () => {
+        // Return all players to lobby
+        setGamePhase("lobby");
+        setCurrentRound(0);
+        setShowFinalResultsState(false);
+        setFinalSummary(null);
+        setResults({});
+        setVotes({});
+        setShowResults(false);
+        setPlayers(prev => prev.map(p => ({ ...p, score: 0, isReady: false })));
+      })
       .on("broadcast", { event: "rps_choice" }, ({ payload }) => {
         setRpsChoices(prev => ({ ...prev, [payload.playerId]: payload.choice }));
       })
@@ -358,9 +395,15 @@ export default function Game() {
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
+          // Determine if this player should be host
+          const shouldBeHost = !roomCreatorId || roomCreatorId === playerId;
+          if (shouldBeHost && !roomCreatorId) {
+            setRoomCreatorId(playerId);
+          }
+          
           await channel.track({
             name: playerName,
-            isHost: !players.some(p => p.isHost),
+            isHost: shouldBeHost,
             isReady: false,
             score: 0,
             streak: 0,
@@ -552,20 +595,67 @@ export default function Game() {
   const submitEarly = () => {
     if (!canSubmitEarly || !roundData) return;
     
-    setRoundData(prev => prev ? { ...prev, submitted: true, submittedAt: Date.now() } : null);
-    setEarlySubmitCount(prev => prev + 1);
-    
-    // Show voting screen immediately when submitting early
-    setShowResults(true);
+    const newCount = earlySubmitCount + 1;
+    setEarlySubmitCount(newCount);
     
     if (isMultiplayer) {
-      broadcastGameState({ earlySubmitCount: earlySubmitCount + 1 });
+      channelRef.current?.send({
+        type: "broadcast",
+        event: "early_submit",
+        payload: { playerId, playerName }
+      });
+      broadcastGameState({ earlySubmitCount: newCount });
     }
     
-    toast({
-      title: "Submitted early!",
-      description: "Waiting for other players or timer to end."
-    });
+    // Mark as submitted for this player
+    setRoundData(prev => prev ? { ...prev, submitted: true } : null);
+    
+    // If host submits early, force all players to submit immediately
+    if (isHost) {
+      forceSubmitAll();
+    } else {
+      // Non-host players can submit early individually
+      const totalPlayers = isMultiplayer ? players.length : 1;
+      const threshold = Math.ceil(totalPlayers / 2);
+      
+      if (newCount >= threshold) {
+        // Majority submitted early, end the round
+        endRound();
+      }
+    }
+  };
+
+  const forceSubmitAll = () => {
+    if (!isHost) return;
+    
+    if (isMultiplayer) {
+      channelRef.current?.send({
+        type: "broadcast",
+        event: "force_submit_all",
+        payload: { hostId: playerId }
+      });
+    }
+    
+    // Collect all current answers (even if incomplete)
+    if (roundData) {
+      const allResults: Record<string, any> = {};
+      
+      // Add host's answers
+      allResults[playerId] = {
+        playerId,
+        playerName,
+        letter: roundData.letter,
+        answers: roundData.answers,
+        categories: roundData.categories
+      };
+      
+      // In multiplayer, other players' results will be handled via broadcast
+      if (!isMultiplayer) {
+        setResults(allResults);
+        setVotingTimeLeft(settings.votingTime);
+        setGamePhase("voting");
+      }
+    }
   };
 
   const endRound = () => {
@@ -807,24 +897,39 @@ export default function Game() {
     if (!currentPlayer || !settings.enablePowerUps) return;
     
     const powerUp = currentPlayer.powerUps?.find(p => p.id === powerUpId);
-    if (!powerUp || powerUp.uses >= powerUp.maxUses) return;
+    if (!powerUp || powerUp.uses >= powerUp.maxUses) {
+      toast({ 
+        title: "Power-up Unavailable", 
+        description: "This power-up has no uses remaining.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     // Apply power-up effect
     switch (powerUp.type) {
       case "time_freeze":
-        if (timeLeft > 0) {
-          pauseTimer();
-          setTimeout(() => resumeTimer(), 10000);
-          toast({ title: "Time Freeze!", description: "Timer paused for 10 seconds" });
+        if (timeLeft > 0 && gamePhase === "playing") {
+          setIsPaused(true);
+          setTimeout(() => setIsPaused(false), 10000);
+          toast({ 
+            title: "⏸️ Time Freeze!", 
+            description: "Timer paused for 10 seconds",
+            className: "border-blue-500 bg-blue-50 dark:bg-blue-950"
+          });
         }
         break;
       case "peek":
         setPeekMode(true);
         setTimeout(() => setPeekMode(false), 15000);
-        toast({ title: "Peek Mode!", description: "See other players' answers for 15 seconds" });
+        toast({ 
+          title: "👁️ Peek Mode!", 
+          description: "See other players' answers for 15 seconds",
+          className: "border-purple-500 bg-purple-50 dark:bg-purple-950"
+        });
         break;
       case "lightning":
-        if (roundData) {
+        if (roundData && gamePhase === "playing") {
           const emptyIndex = roundData.categories.findIndex((_, i) => !roundData.answers[i]);
           if (emptyIndex !== -1) {
             const autoAnswer = generateAutoAnswer(roundData.categories[emptyIndex], roundData.letter);
@@ -832,17 +937,38 @@ export default function Game() {
               ...prev,
               answers: { ...prev.answers, [emptyIndex]: autoAnswer }
             } : null);
-            toast({ title: "Lightning Strike!", description: "Auto-filled an answer!" });
+            toast({ 
+              title: "⚡ Lightning Strike!", 
+              description: `Auto-filled "${autoAnswer}" for ${roundData.categories[emptyIndex]}!`,
+              className: "border-yellow-500 bg-yellow-50 dark:bg-yellow-950"
+            });
+          } else {
+            toast({ 
+              title: "Lightning Fizzled", 
+              description: "All categories already have answers!",
+              variant: "destructive"
+            });
+            return; // Don't consume the power-up
           }
         }
         break;
       case "double_points":
-        // This would need to be handled in scoring logic
-        toast({ title: "Double Points!", description: "Next round answers worth double!" });
+        // Add temporary double points effect
+        setActivePowerUps(prev => new Set([...prev, "double_points"]));
+        toast({ 
+          title: "🔥 Double Points!", 
+          description: "Your next valid answers are worth double points!",
+          className: "border-orange-500 bg-orange-50 dark:bg-orange-950"
+        });
         break;
       case "shield":
-        // This would protect from negative votes
-        toast({ title: "Shield Active!", description: "Protected from disqualifications!" });
+        // Add temporary shield effect
+        setActivePowerUps(prev => new Set([...prev, "shield"]));
+        toast({ 
+          title: "🛡️ Shield Active!", 
+          description: "Protected from disqualifications this round!",
+          className: "border-green-500 bg-green-50 dark:bg-green-950"
+        });
         break;
     }
 
@@ -852,8 +978,22 @@ export default function Game() {
     ) || [];
 
     setCurrentPlayer(prev => prev ? { ...prev, powerUps: updatedPowerUps } : null);
-    setActivePowerUps(prev => new Set([...prev, powerUpId]));
     
+    // Update presence with new power-up state
+    if (isMultiplayer && channelRef.current) {
+      channelRef.current.track({
+        name: playerName,
+        isHost: roomCreatorId === playerId,
+        isReady: currentPlayer.isReady,
+        score: currentPlayer.score || 0,
+        streak: currentPlayer.streak || 0,
+        powerUps: updatedPowerUps,
+        achievements: currentPlayer.achievements || []
+      });
+    }
+    
+    // Visual feedback
+    setActivePowerUps(prev => new Set([...prev, powerUpId]));
     setTimeout(() => {
       setActivePowerUps(prev => {
         const newSet = new Set(prev);
@@ -1348,7 +1488,15 @@ export default function Game() {
     return (
       <ResultsOverlay
         open={showResults}
-        onClose={() => setShowResults(false)}
+        onClose={(skipEarlyReturn) => {
+          if (!skipEarlyReturn) {
+            setShowResults(false);
+            // Allow viewing results even if closing early
+            setTimeout(() => setShowResults(true), 100);
+          } else {
+            setShowResults(false);
+          }
+        }}
         results={mockResults}
         presentCount={players.length}
         votes={votes}
@@ -1586,15 +1734,47 @@ export default function Game() {
         {finalSummary && (
           <FinalScoreboard
             open={showFinalResultsState}
-            onClose={() => setShowFinalResultsState(false)}
-            summary={finalSummary}
-            isHost={isHost}
-            onPlayAgain={() => {
+            onClose={() => {
+              // Return to lobby for all players
+              if (isHost && isMultiplayer) {
+                channelRef.current?.send({
+                  type: "broadcast",
+                  event: "return_to_lobby",
+                  payload: {}
+                });
+              }
+              
               setShowFinalResultsState(false);
               setGamePhase("lobby");
               setCurrentRound(0);
-              // Reset player scores
-              setPlayers(prev => prev.map(p => ({ ...p, score: 0 })));
+              setFinalSummary(null);
+              setResults({});
+              setVotes({});
+              setShowResults(false);
+              // Reset player scores and ready state
+              setPlayers(prev => prev.map(p => ({ ...p, score: 0, isReady: false })));
+            }}
+            summary={finalSummary}
+            isHost={isHost}
+            onPlayAgain={() => {
+              // Reset game for new match
+              if (isHost && isMultiplayer) {
+                channelRef.current?.send({
+                  type: "broadcast",
+                  event: "return_to_lobby", 
+                  payload: {}
+                });
+              }
+              
+              setShowFinalResultsState(false);
+              setGamePhase("lobby");
+              setCurrentRound(0);
+              setFinalSummary(null);
+              setResults({});
+              setVotes({});
+              setShowResults(false);
+              // Reset player scores and ready state for new game
+              setPlayers(prev => prev.map(p => ({ ...p, score: 0, isReady: false })));
             }}
           />
         )}
@@ -1613,14 +1793,35 @@ export default function Game() {
             </DialogDescription>
           </DialogHeader>
           
-          {rpsResults ? (
-            <div className="text-center py-8">
-              <div className="text-4xl font-bold text-green-600 mb-2">
-                🎉 {rpsResults} Wins! 🎉
-              </div>
-              <p className="text-muted-foreground">Tiebreaker complete</p>
+        {rpsResults ? (
+          <div className="text-center py-8">
+            <div className="text-4xl font-bold text-green-600 mb-2">
+              🎉 {rpsResults} Wins! 🎉
             </div>
-          ) : (
+            <p className="text-muted-foreground">Tiebreaker complete</p>
+            <div className="mt-4">
+              <Button 
+                onClick={() => {
+                  setShowRockPaperScissors(false);
+                  // Return to lobby after tiebreaker
+                  if (isHost && isMultiplayer) {
+                    channelRef.current?.send({
+                      type: "broadcast",
+                      event: "return_to_lobby",
+                      payload: {}
+                    });
+                  }
+                  setGamePhase("lobby");
+                  setCurrentRound(0);
+                  setPlayers(prev => prev.map(p => ({ ...p, score: 0, isReady: false })));
+                }}
+                className="glass-card"
+              >
+                Return to Lobby
+              </Button>
+            </div>
+          </div>
+        ) : (
             <div className="grid grid-cols-3 gap-4 py-4">
               {["rock", "paper", "scissors"].map(choice => (
                 <Button

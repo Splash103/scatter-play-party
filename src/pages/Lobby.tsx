@@ -192,6 +192,7 @@ const Lobby = () => {
                               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Crown className="w-3 h-3" />
                                 <span>Hosted by {room.hostName}</span>
+                                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" title="Online"></div>
                               </div>
                             )}
                           </div>

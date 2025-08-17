@@ -226,7 +226,7 @@ export default function Game() {
 
   // Room advertising for public rooms
   usePublicRoomAdvertiser({
-    enabled: isMultiplayer && isHost && settings.publicRoom,
+    enabled: isMultiplayer && isHost && roomCreatorId === playerId && settings.publicRoom,
     roomCode: roomCode || "",
     payload: {
       name: `${playerName}'s Room`,
@@ -318,7 +318,8 @@ export default function Game() {
         if (currentPlayerData) {
           setCurrentPlayer(currentPlayerData);
           // Only room creator is host
-          setIsHost(roomCreatorId === playerId);
+          const isRoomCreator = roomCreatorId === playerId;
+          setIsHost(isRoomCreator);
         }
       })
       .on("broadcast", { event: "game_state" }, ({ payload }) => {
@@ -395,10 +396,18 @@ export default function Game() {
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
-          // Determine if this player should be host
-          const shouldBeHost = !roomCreatorId || roomCreatorId === playerId;
-          if (shouldBeHost && !roomCreatorId) {
+          // Determine if this player should be host based on room creation
+          let shouldBeHost = false;
+          
+          // If no room creator is set yet, this player becomes the creator
+          if (!roomCreatorId) {
             setRoomCreatorId(playerId);
+            shouldBeHost = true;
+            setIsHost(true);
+          } else {
+            // Only the room creator is host
+            shouldBeHost = roomCreatorId === playerId;
+            setIsHost(shouldBeHost);
           }
           
           await channel.track({
@@ -454,24 +463,45 @@ export default function Game() {
   const toggleReady = async () => {
     if (!channelRef.current || !currentPlayer) return;
     const newReady = !currentPlayer.isReady;
+    
+    // Update current player state locally first
+    setCurrentPlayer(prev => prev ? { ...prev, isReady: newReady } : null);
+    
     await channelRef.current.track({
-      ...currentPlayer,
-      isReady: newReady
+      name: playerName,
+      isHost: roomCreatorId === playerId,
+      isReady: newReady,
+      score: currentPlayer.score || 0,
+      streak: currentPlayer.streak || 0,
+      powerUps: currentPlayer.powerUps || [...POWER_UPS],
+      achievements: currentPlayer.achievements || []
     });
   };
 
   const startMatch = () => {
-    if (!isHost) return;
+    console.log('startMatch called', { isHost, roomCreatorId, playerId, players });
     
-    const readyPlayers = players.filter(p => p.isReady || p.isHost);
-    if (readyPlayers.length < 1) {
+    if (!isHost || roomCreatorId !== playerId) {
       toast({
-        title: "Cannot start",
-        description: "At least one player must be ready."
+        title: "Not authorized",
+        description: "Only the room creator can start the match."
       });
       return;
     }
+    
+    // In multiplayer, check if at least one other player is ready or if it's solo
+    if (isMultiplayer) {
+      const readyPlayers = players.filter(p => p.isReady || p.isHost);
+      if (readyPlayers.length < 1) {
+        toast({
+          title: "Cannot start",
+          description: "At least one player must be ready to start."
+        });
+        return;
+      }
+    }
 
+    console.log('Starting new round...');
     startNewRound();
     playRoundStart();
   };
@@ -1187,11 +1217,17 @@ export default function Game() {
                   {currentPlayer?.isReady ? "Not Ready" : "Ready Up"}
                 </Button>
               )}
-              {isHost && (
+              {isHost && roomCreatorId === playerId && (
                 <Button onClick={startMatch} className="glass-card hover:scale-105">
                   <Play className="w-4 h-4 mr-2" />
                   Start Match
                 </Button>
+              )}
+              {/* Debug info for host issues */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="text-xs text-muted-foreground">
+                  Debug: isHost={isHost.toString()}, roomCreator={roomCreatorId}, currentPlayer={playerId}
+                </div>
               )}
             </div>
           </CardContent>

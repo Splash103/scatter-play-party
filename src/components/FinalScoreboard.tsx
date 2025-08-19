@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -60,6 +60,7 @@ export function FinalScoreboard({
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Final Scoreboard</DialogTitle>
+          <DialogDescription>Game completed - here are the final standings</DialogDescription>
         </DialogHeader>
         {!summary ? null : (
           <div className="space-y-4">

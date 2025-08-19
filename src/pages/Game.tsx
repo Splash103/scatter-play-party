@@ -320,6 +320,7 @@ export default function Game() {
           // Only room creator is host
           const isRoomCreator = roomCreatorId === playerId;
           setIsHost(isRoomCreator);
+          console.log('Updated host status from presence:', { playerId, roomCreatorId, isRoomCreator });
         }
       })
       .on("broadcast", { event: "game_state" }, ({ payload }) => {
@@ -403,12 +404,13 @@ export default function Game() {
           if (!roomCreatorId) {
             setRoomCreatorId(playerId);
             shouldBeHost = true;
-            setIsHost(true);
           } else {
             // Only the room creator is host
             shouldBeHost = roomCreatorId === playerId;
-            setIsHost(shouldBeHost);
           }
+          
+          setIsHost(shouldBeHost);
+          console.log('Host status set:', { playerId, roomCreatorId, shouldBeHost });
           
           await channel.track({
             name: playerName,
@@ -1229,12 +1231,6 @@ export default function Game() {
                   <Play className="w-4 h-4 mr-2" />
                   Start Match
                 </Button>
-              )}
-              {/* Debug info for host issues */}
-              {process.env.NODE_ENV === 'development' && (
-                <div className="text-xs text-muted-foreground">
-                  Debug: isHost={isHost.toString()}, roomCreator={roomCreatorId}, currentPlayer={playerId}
-                </div>
               )}
             </div>
           </CardContent>

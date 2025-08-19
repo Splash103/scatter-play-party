@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { gradientFromString, initialsFromName } from "@/lib/gradient";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import Particles from "@/components/Particles";
@@ -153,6 +153,7 @@ const Index = () => {
             <DialogContent className="glass-panel border-0">
               <DialogHeader>
                 <DialogTitle className="text-2xl text-center mb-4">Choose Your Adventure</DialogTitle>
+                <DialogDescription className="text-center text-muted-foreground">Choose your game mode and start playing immediately</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Button 
@@ -180,6 +181,7 @@ const Index = () => {
             <DialogContent className="glass-panel border-0">
               <DialogHeader>
                 <DialogTitle className="text-2xl text-center mb-6">Player Profile</DialogTitle>
+                <DialogDescription className="text-center text-muted-foreground">Customize your player name and gaming identity</DialogDescription>
               </DialogHeader>
               <div className="flex flex-col items-center gap-6">
                 <Avatar className="w-20 h-20 border-4 border-white/20">

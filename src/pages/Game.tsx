@@ -297,30 +297,38 @@ export default function Game() {
             score: presence.score || 0,
             streak: presence.streak || 0,
             powerUps: presence.powerUps || [...POWER_UPS],
-            achievements: presence.achievements || []
+            achievements: presence.achievements || [],
+            roomCreatorId: presence.roomCreatorId
           };
         });
-        setPlayers(playerList);
         
-        // Store room creator to ensure only they are host
-        if (!roomCreatorId) {
-          const hostPlayer = playerList.find(p => p.isHost);
-          if (hostPlayer) {
-            setRoomCreatorId(hostPlayer.id);
-          } else if (playerList.length === 1) {
-            // First player becomes room creator and host
-            setRoomCreatorId(playerId);
-            setIsHost(true);
+        // Find the room creator from existing players or determine first player
+        let actualRoomCreatorId = roomCreatorId;
+        if (!actualRoomCreatorId) {
+          // Check if any player already has roomCreatorId set
+          const existingCreator = playerList.find(p => p.roomCreatorId);
+          if (existingCreator) {
+            actualRoomCreatorId = existingCreator.roomCreatorId;
+          } else {
+            // First player becomes room creator
+            actualRoomCreatorId = playerList[0]?.id || playerId;
           }
+          setRoomCreatorId(actualRoomCreatorId);
         }
         
-        const currentPlayerData = playerList.find(p => p.id === playerId);
+        // Update player list with correct host status - only room creator is host
+        const updatedPlayerList = playerList.map(p => ({
+          ...p,
+          isHost: p.id === actualRoomCreatorId
+        }));
+        setPlayers(updatedPlayerList);
+        
+        const currentPlayerData = updatedPlayerList.find(p => p.id === playerId);
         if (currentPlayerData) {
           setCurrentPlayer(currentPlayerData);
-          // Only room creator is host
-          const isRoomCreator = roomCreatorId === playerId;
+          const isRoomCreator = actualRoomCreatorId === playerId;
           setIsHost(isRoomCreator);
-          console.log('Updated host status from presence:', { playerId, roomCreatorId, isRoomCreator });
+          console.log('Updated host status from presence:', { playerId, roomCreatorId: actualRoomCreatorId, isRoomCreator });
         }
       })
       .on("broadcast", { event: "game_state" }, ({ payload }) => {
@@ -397,20 +405,22 @@ export default function Game() {
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
-          // Determine if this player should be host based on room creation
+          // For first subscription, determine room creator
+          let actualRoomCreatorId = roomCreatorId;
           let shouldBeHost = false;
           
-          // If no room creator is set yet, this player becomes the creator
-          if (!roomCreatorId) {
-            setRoomCreatorId(playerId);
+          if (!actualRoomCreatorId) {
+            // This player becomes the room creator
+            actualRoomCreatorId = playerId;
+            setRoomCreatorId(actualRoomCreatorId);
             shouldBeHost = true;
           } else {
-            // Only the room creator is host
-            shouldBeHost = roomCreatorId === playerId;
+            // Check if this player is the room creator
+            shouldBeHost = actualRoomCreatorId === playerId;
           }
           
           setIsHost(shouldBeHost);
-          console.log('Host status set:', { playerId, roomCreatorId, shouldBeHost });
+          console.log('Host status set:', { playerId, roomCreatorId: actualRoomCreatorId, shouldBeHost });
           
           await channel.track({
             name: playerName,
@@ -419,7 +429,8 @@ export default function Game() {
             score: 0,
             streak: 0,
             powerUps: [...POWER_UPS],
-            achievements: []
+            achievements: [],
+            roomCreatorId: actualRoomCreatorId
           });
         }
       });
@@ -476,7 +487,8 @@ export default function Game() {
       score: currentPlayer.score || 0,
       streak: currentPlayer.streak || 0,
       powerUps: currentPlayer.powerUps || [...POWER_UPS],
-      achievements: currentPlayer.achievements || []
+      achievements: currentPlayer.achievements || [],
+      roomCreatorId: roomCreatorId
     });
   };
 
@@ -1027,7 +1039,8 @@ export default function Game() {
         score: currentPlayer.score || 0,
         streak: currentPlayer.streak || 0,
         powerUps: updatedPowerUps,
-        achievements: currentPlayer.achievements || []
+        achievements: currentPlayer.achievements || [],
+        roomCreatorId: roomCreatorId
       });
     }
     

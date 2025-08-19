@@ -226,7 +226,7 @@ export default function Game() {
 
   // Room advertising for public rooms
   usePublicRoomAdvertiser({
-    enabled: isMultiplayer && isHost && roomCreatorId === playerId && settings.publicRoom,
+    enabled: isMultiplayer && (roomCreatorId === playerId) && settings.publicRoom,
     roomCode: roomCode || "",
     payload: {
       name: `${playerName}'s Room`,
@@ -481,7 +481,16 @@ export default function Game() {
   const startMatch = () => {
     console.log('startMatch called', { isHost, roomCreatorId, playerId, players });
     
-    if (!isHost || roomCreatorId !== playerId) {
+    // For solo play, host should always be able to start
+    if (!isMultiplayer) {
+      console.log('Starting solo game...');
+      startNewRound();
+      playRoundStart();
+      return;
+    }
+    
+    // For multiplayer, only room creator can start
+    if (roomCreatorId !== playerId) {
       toast({
         title: "Not authorized",
         description: "Only the room creator can start the match."
@@ -489,19 +498,17 @@ export default function Game() {
       return;
     }
     
-    // In multiplayer, check if at least one other player is ready or if it's solo
-    if (isMultiplayer) {
-      const readyPlayers = players.filter(p => p.isReady || p.isHost);
-      if (readyPlayers.length < 1) {
-        toast({
-          title: "Cannot start",
-          description: "At least one player must be ready to start."
-        });
-        return;
-      }
+    // Check if players are ready (host doesn't need to be ready)
+    const readyPlayers = players.filter(p => p.isReady || p.isHost);
+    if (readyPlayers.length < 1) {
+      toast({
+        title: "Cannot start",
+        description: "At least one player must be ready to start."
+      });
+      return;
     }
 
-    console.log('Starting new round...');
+    console.log('Starting multiplayer game...');
     startNewRound();
     playRoundStart();
   };
@@ -1217,7 +1224,7 @@ export default function Game() {
                   {currentPlayer?.isReady ? "Not Ready" : "Ready Up"}
                 </Button>
               )}
-              {isHost && roomCreatorId === playerId && (
+              {((!isMultiplayer && isHost) || (isMultiplayer && roomCreatorId === playerId)) && (
                 <Button onClick={startMatch} className="glass-card hover:scale-105">
                   <Play className="w-4 h-4 mr-2" />
                   Start Match

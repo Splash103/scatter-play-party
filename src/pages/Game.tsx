@@ -1173,7 +1173,7 @@ export default function Game() {
                     {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   </Button>
                 )}
-                {isHost && (
+                {(isHost || (!isMultiplayer) || (roomCreatorId === playerId)) && (
                   <Button variant="outline" size="sm" onClick={() => setShowSettings(true)} className="glass-card">
                     <Settings className="w-4 h-4" />
                   </Button>

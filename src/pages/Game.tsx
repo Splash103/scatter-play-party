@@ -1576,7 +1576,7 @@ export default function Game() {
         open={resultsOpen}
         onClose={() => {
           setResultsOpen(false);
-          setShowResults(false);
+          // Don't change gamePhase - let the game continue showing in background
         }}
         results={results}
         presentCount={players.length}
@@ -1609,6 +1609,7 @@ export default function Game() {
         <div className="relative z-10 container py-8">
           {gamePhase === "lobby" && renderLobby()}
           {gamePhase === "playing" && renderGame()}
+          {gamePhase === "results" && !resultsOpen && renderGame()}
           {renderVotingScreen()}
         </div>
 

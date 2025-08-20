@@ -1385,7 +1385,7 @@ export default function Game() {
                   </div>
                   
                   {/* Host Controls */}
-                  {isHost && (
+                  {isHost && gamePhase === "playing" && (
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
@@ -1412,6 +1412,19 @@ export default function Game() {
                         End Game
                       </Button>
                     </div>
+                  )}
+                  
+                  {/* Results Controls */}
+                  {gamePhase === "results" && !resultsOpen && votingTimeLeft > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setResultsOpen(true)}
+                      className="glass-card text-blue-600 hover:text-blue-700"
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      View Results
+                    </Button>
                   )}
                 </div>
               </div>

@@ -36,7 +36,7 @@ export function ResultsOverlay({
   players,
 }: {
   open: boolean;
-  onClose: (skipEarlyReturn?: boolean) => void;
+  onClose: () => void;
   results: Record<string, PlayerResult>;
   presentCount: number;
   votes: Record<string, string[]>;
@@ -135,10 +135,10 @@ export function ResultsOverlay({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onClose(false)}
+              onClick={onClose}
               className="glass-card hover:scale-105"
             >
-              Keep Viewing
+              Close Results
             </Button>
             <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
             <span className="text-sm text-muted-foreground font-medium">

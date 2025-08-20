@@ -97,6 +97,9 @@ interface GameSettings {
   publicRoom: boolean;
   maxPlayers: number;
   categoryList: string;
+  autoSubmitOnTimeout: boolean; // auto-submit when timer ends
+  autoSubmitOnEarlySubmit: boolean; // auto-submit when players submit early
+  autoSubmitOnStop: boolean; // auto-submit when host stops round
 }
 
 interface RoundData {
@@ -120,7 +123,10 @@ const DEFAULT_SETTINGS: GameSettings = {
   enableAchievements: true,
   publicRoom: false,
   maxPlayers: 8,
-  categoryList: "classic-1"
+  categoryList: "classic-1",
+  autoSubmitOnTimeout: true,
+  autoSubmitOnEarlySubmit: true,
+  autoSubmitOnStop: true
 };
 
 const POWER_UPS: PowerUp[] = [
@@ -373,6 +379,16 @@ export default function Game() {
           });
         }
       })
+      .on("broadcast", { event: "auto_submit_all" }, ({ payload }) => {
+        // Auto-submit all players' current answers
+        if (roundData && !roundData.submitted) {
+          setRoundData(prev => prev ? { ...prev, submitted: true } : null);
+          toast({ 
+            title: "Round Auto-Submitted", 
+            description: "All answers were automatically submitted!" 
+          });
+        }
+      })
       .on("broadcast", { event: "return_to_lobby" }, () => {
         // Return all players to lobby
         setGamePhase("lobby");
@@ -580,6 +596,9 @@ export default function Game() {
         
         // End round when timer reaches 0
         if (newTime <= 0) {
+          if (settings.autoSubmitOnTimeout) {
+            autoSubmitAllPlayers();
+          }
           endRound();
           return 0;
         }
@@ -631,6 +650,11 @@ export default function Game() {
     if (!isHost) return;
     setShowStopDialog(false);
     
+    // Auto-submit if enabled
+    if (settings.autoSubmitOnStop) {
+      autoSubmitAllPlayers();
+    }
+    
     // Broadcast stop round to all players
     if (isMultiplayer) {
       channelRef.current?.send({
@@ -663,26 +687,30 @@ export default function Game() {
     
     // If host submits early, force all players to submit immediately
     if (isHost) {
-      forceSubmitAll();
+      if (settings.autoSubmitOnEarlySubmit) {
+        autoSubmitAllPlayers();
+      }
+      endRound();
     } else {
       // Non-host players can submit early individually
       const totalPlayers = isMultiplayer ? players.length : 1;
       const threshold = Math.ceil(totalPlayers / 2);
       
       if (newCount >= threshold) {
-        // Majority submitted early, end the round
+        // Majority submitted early, auto-submit and end the round
+        if (settings.autoSubmitOnEarlySubmit) {
+          autoSubmitAllPlayers();
+        }
         endRound();
       }
     }
   };
 
-  const forceSubmitAll = () => {
-    if (!isHost) return;
-    
+  const autoSubmitAllPlayers = () => {
     if (isMultiplayer) {
       channelRef.current?.send({
         type: "broadcast",
-        event: "force_submit_all",
+        event: "auto_submit_all",
         payload: { hostId: playerId }
       });
     }
@@ -691,20 +719,17 @@ export default function Game() {
     if (roundData) {
       const allResults: Record<string, any> = {};
       
-      // Add host's answers
+      // Add current player's answers
       allResults[playerId] = {
         playerId,
-        playerName,
+        name: playerName,
         letter: roundData.letter,
-        answers: roundData.answers,
-        categories: roundData.categories
+        answers: roundData.answers
       };
       
-      // In multiplayer, other players' results will be handled via broadcast
+      // In solo mode, set results immediately
       if (!isMultiplayer) {
         setResults(allResults);
-        setVotingTimeLeft(settings.votingTime);
-        setGamePhase("voting");
       }
     }
   };
@@ -719,38 +744,55 @@ export default function Game() {
     setGamePhase("results");
     setVotingTimeLeft(settings.votingTime); // Use configured voting time
     
-    if (isMultiplayer && isHost) {
-      // Collect all results and broadcast
-      const roundResults = {
-        results: Object.fromEntries(
-          players.map(p => [p.id, {
-            playerId: p.id,
-            name: p.name,
-            letter: roundData?.letter || null,
-            answers: roundData?.answers || {}
-          }])
-        ),
-        votes: votes
-      };
-      
-      channelRef.current?.send({
-        type: "broadcast",
-        event: "round_results",
-        payload: roundResults
+    // Collect results from all players
+    const roundResults: Record<string, any> = {};
+    
+    if (isMultiplayer) {
+      // For multiplayer, collect all players' answers
+      players.forEach(player => {
+        roundResults[player.id] = {
+          playerId: player.id,
+          name: player.name,
+          letter: roundData?.letter || null,
+          answers: player.id === playerId ? (roundData?.answers || {}) : {}
+        };
       });
-    }
-
-    // Check if game should end (currentRound is 0-indexed, so check >= maxRounds - 1)
-    if (currentRound >= settings.maxRounds - 1) {
-      setTimeout(() => endGame(), 3000);
+      
+      if (isHost) {
+        // Host broadcasts results to all players
+        channelRef.current?.send({
+          type: "broadcast",
+          event: "round_results",
+          payload: { results: roundResults, votes: votes }
+        });
+      }
     } else {
-      // Move to next round after voting
-      setTimeout(() => {
-        if (isHost) {
+      // Solo game - just add current player's results
+      roundResults[playerId] = {
+        playerId,
+        name: playerName,
+        letter: roundData?.letter || null,
+        answers: roundData?.answers || {}
+      };
+    }
+    
+    setResults(roundResults);
+    setResultsOpen(true);
+    
+    // Schedule round progression or game end
+    setTimeout(() => {
+      setResultsOpen(false);
+      
+      // Check if game should end (currentRound is 0-indexed, so check >= maxRounds - 1)
+      if (currentRound >= settings.maxRounds - 1) {
+        endGame();
+      } else {
+        // Move to next round
+        if (isHost || !isMultiplayer) {
           nextRound();
         }
-      }, settings.votingTime * 1000); // Wait for voting to complete
-    }
+      }
+    }, settings.votingTime * 1000); // Wait for voting to complete
   };
 
   const showRoundResults = () => {
@@ -855,7 +897,10 @@ export default function Game() {
     setCurrentRound(newRound);
     setGamePhase("playing");
     setShowResults(false);
+    setResultsOpen(false);
     setVotingTimeLeft(0);
+    setResults({});
+    setVotes({});
     startNewRound();
   };
 
@@ -905,8 +950,6 @@ export default function Game() {
   };
 
   const startNextRound = () => {
-    const nextRound = currentRound + 1;
-    setCurrentRound(nextRound);
     setGamePhase("playing");
     setTimeLeft(settings.roundTime);
     setVotingTimeLeft(0);
@@ -914,6 +957,7 @@ export default function Game() {
     setResults({});
     setVotes({});
     setShowResults(false);
+    setResultsOpen(false);
     setEarlySubmitCount(0);
     
     // Generate new round data
@@ -935,7 +979,7 @@ export default function Game() {
         roundData: newRoundData,
         timeLeft: settings.roundTime,
         votingTimeLeft: 0,
-        currentRound: nextRound,
+        currentRound: currentRound,
         showResults: false,
         earlySubmitCount: 0
       });
@@ -1525,31 +1569,16 @@ export default function Game() {
   };
 
   const renderVotingScreen = () => {
-    if (!showResults || !roundData) return null;
-
-    // Create mock results for all players with their current answers
-    const mockResults = Object.fromEntries(
-      players.map(p => [p.id, {
-        playerId: p.id,
-        name: p.name,
-        letter: roundData.letter,
-        answers: p.id === playerId ? roundData.answers : {} // Only show current player's answers for now
-      }])
-    );
+    if (!resultsOpen || !roundData) return null;
 
     return (
       <ResultsOverlay
-        open={showResults}
-        onClose={(skipEarlyReturn) => {
-          if (!skipEarlyReturn) {
-            setShowResults(false);
-            // Allow viewing results even if closing early
-            setTimeout(() => setShowResults(true), 100);
-          } else {
-            setShowResults(false);
-          }
+        open={resultsOpen}
+        onClose={() => {
+          setResultsOpen(false);
+          setShowResults(false);
         }}
-        results={mockResults}
+        results={results}
         presentCount={players.length}
         votes={votes}
         onVote={vote}
@@ -1705,6 +1734,39 @@ export default function Game() {
                     <Switch 
                       checked={settings.enablePowerUps}
                       onCheckedChange={(checked) => setSettings(prev => ({ ...prev, enablePowerUps: checked }))}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Auto-submit on Timeout</Label>
+                      <p className="text-sm text-muted-foreground">Automatically submit when timer ends</p>
+                    </div>
+                    <Switch 
+                      checked={settings.autoSubmitOnTimeout}
+                      onCheckedChange={(checked) => setSettings(prev => ({ ...prev, autoSubmitOnTimeout: checked }))}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Auto-submit on Early Submit</Label>
+                      <p className="text-sm text-muted-foreground">Automatically submit when players submit early</p>
+                    </div>
+                    <Switch 
+                      checked={settings.autoSubmitOnEarlySubmit}
+                      onCheckedChange={(checked) => setSettings(prev => ({ ...prev, autoSubmitOnEarlySubmit: checked }))}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Auto-submit on Stop</Label>
+                      <p className="text-sm text-muted-foreground">Automatically submit when host stops round</p>
+                    </div>
+                    <Switch 
+                      checked={settings.autoSubmitOnStop}
+                      onCheckedChange={(checked) => setSettings(prev => ({ ...prev, autoSubmitOnStop: checked }))}
                     />
                   </div>
                   

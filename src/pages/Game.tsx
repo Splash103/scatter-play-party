@@ -208,6 +208,7 @@ export default function Game() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [votes, setVotes] = useState<Record<string, string[]>>({});
   const [results, setResults] = useState<Record<string, any>>({});
+  const [allPlayersAnswers, setAllPlayersAnswers] = useState<Record<string, any>>({});
   const [finalSummary, setFinalSummary] = useState<FinalSummary | null>(null);
   const [resultsOpen, setResultsOpen] = useState(false);
   const [showRoundTransition, setShowRoundTransition] = useState(false);
@@ -405,6 +406,12 @@ export default function Game() {
         }));
         playVote();
       })
+      .on("broadcast", { event: "player_answers" }, ({ payload }) => {
+        setAllPlayersAnswers(prev => ({
+          ...prev,
+          [payload.playerId]: payload
+        }));
+      })
       .on("broadcast", { event: "round_results" }, ({ payload }) => {
         setResults(payload.results);
         setVotes(payload.votes || {});
@@ -438,6 +445,8 @@ export default function Game() {
         // Auto-submit all players' current answers
         if (roundData && !roundData.submitted) {
           setRoundData(prev => prev ? { ...prev, submitted: true } : null);
+          // Broadcast this player's answers when auto-submitted
+          broadcastPlayerAnswers();
           toast({ 
             title: "Round Auto-Submitted", 
             description: "All answers were automatically submitted!" 
@@ -452,6 +461,7 @@ export default function Game() {
         setFinalSummary(null);
         setResults({});
         setVotes({});
+        setAllPlayersAnswers({});
         setShowResults(false);
         setPlayers(prev => prev.map(p => ({ ...p, score: 0, isReady: false })));
       })
@@ -706,8 +716,37 @@ export default function Game() {
     endRound();
   };
 
+  const broadcastPlayerAnswers = () => {
+    if (!isMultiplayer || !channelRef.current || !roundData) return;
+    
+    const playerAnswers = {
+      playerId,
+      name: playerName,
+      letter: roundData.letter,
+      answers: roundData.answers || {}
+    };
+    
+    channelRef.current.send({
+      type: "broadcast",
+      event: "player_answers",
+      payload: playerAnswers
+    });
+    
+    // Also store locally
+    setAllPlayersAnswers(prev => ({
+      ...prev,
+      [playerId]: playerAnswers
+    }));
+  };
+
   const submitEarly = () => {
     if (!canSubmitEarly || !roundData) return;
+    
+    // Mark as submitted for this player first
+    setRoundData(prev => prev ? { ...prev, submitted: true } : null);
+    
+    // Broadcast this player's answers
+    broadcastPlayerAnswers();
     
     const newCount = earlySubmitCount + 1;
     setEarlySubmitCount(newCount);
@@ -721,15 +760,12 @@ export default function Game() {
       broadcastGameState({ earlySubmitCount: newCount });
     }
     
-    // Mark as submitted for this player
-    setRoundData(prev => prev ? { ...prev, submitted: true } : null);
-    
     // If host submits early, force all players to submit immediately
     if (isHost) {
       if (settings.autoSubmitOnEarlySubmit) {
-        autoSubmitAllPlayers();
+        setTimeout(() => autoSubmitAllPlayers(), 100); // Small delay to ensure answers are broadcast first
       }
-      endRound();
+      setTimeout(() => endRound(), 200);
     } else {
       // Non-host players can submit early individually
       const totalPlayers = isMultiplayer ? players.length : 1;
@@ -738,38 +774,26 @@ export default function Game() {
       if (newCount >= threshold) {
         // Majority submitted early, auto-submit and end the round
         if (settings.autoSubmitOnEarlySubmit) {
-          autoSubmitAllPlayers();
+          setTimeout(() => autoSubmitAllPlayers(), 100);
         }
-        endRound();
+        // Only host can end the round
+        if (isHost) {
+          setTimeout(() => endRound(), 200);
+        }
       }
     }
   };
 
   const autoSubmitAllPlayers = () => {
+    // Force all players to broadcast their current answers
+    broadcastPlayerAnswers();
+    
     if (isMultiplayer) {
       channelRef.current?.send({
         type: "broadcast",
         event: "auto_submit_all",
         payload: { hostId: playerId }
       });
-    }
-    
-    // Collect all current answers (even if incomplete)
-    if (roundData) {
-      const allResults: Record<string, any> = {};
-      
-      // Add current player's answers
-      allResults[playerId] = {
-        playerId,
-        name: playerName,
-        letter: roundData.letter,
-        answers: roundData.answers
-      };
-      
-      // In solo mode, set results immediately
-      if (!isMultiplayer) {
-        setResults(allResults);
-      }
     }
   };
 
@@ -779,59 +803,65 @@ export default function Game() {
       timerRef.current = null;
     }
 
+    // Ensure all players broadcast their answers before ending
+    broadcastPlayerAnswers();
+
     setShowResults(true);
     setGamePhase("results");
-    setVotingTimeLeft(settings.votingTime); // Use configured voting time
+    setVotingTimeLeft(settings.votingTime);
     
-    // Collect results from all players
-    const roundResults: Record<string, any> = {};
-    
-    if (isMultiplayer) {
-      // For multiplayer, collect all players' answers
-      players.forEach(player => {
-        roundResults[player.id] = {
-          playerId: player.id,
-          name: player.name,
-          letter: roundData?.letter || null,
-          answers: player.id === playerId ? (roundData?.answers || {}) : {}
-        };
-      });
-      
-      if (isHost) {
-        // Host broadcasts results to all players
-        channelRef.current?.send({
-          type: "broadcast",
-          event: "round_results",
-          payload: { results: roundResults, votes: votes }
-        });
-      }
-    } else {
-      // Solo game - just add current player's results
-      roundResults[playerId] = {
-        playerId,
-        name: playerName,
-        letter: roundData?.letter || null,
-        answers: roundData?.answers || {}
-      };
-    }
-    
-    setResults(roundResults);
-    setResultsOpen(true);
-    
-    // Schedule round progression or game end
+    // Wait a moment for all player answers to be received, then collect results
     setTimeout(() => {
-      setResultsOpen(false);
+      const roundResults: Record<string, any> = {};
       
-      // Check if game should end (currentRound is 0-indexed, so check >= maxRounds - 1)
-      if (currentRound >= settings.maxRounds - 1) {
-        endGame();
-      } else {
-        // Move to next round
-        if (isHost || !isMultiplayer) {
-          nextRound();
+      if (isMultiplayer) {
+        // Use collected answers from all players
+        players.forEach(player => {
+          const playerAnswers = allPlayersAnswers[player.id];
+          roundResults[player.id] = {
+            playerId: player.id,
+            name: player.name,
+            letter: roundData?.letter || null,
+            answers: playerAnswers?.answers || {}
+          };
+        });
+        
+        if (isHost) {
+          // Host broadcasts results to all players
+          channelRef.current?.send({
+            type: "broadcast",
+            event: "round_results",
+            payload: { results: roundResults, votes: votes }
+          });
         }
+      } else {
+        // Solo game - just add current player's results
+        roundResults[playerId] = {
+          playerId,
+          name: playerName,
+          letter: roundData?.letter || null,
+          answers: roundData?.answers || {}
+        };
       }
-    }, settings.votingTime * 1000); // Wait for voting to complete
+      
+      setResults(roundResults);
+      setResultsOpen(true);
+      
+      // Schedule round progression or game end
+      setTimeout(() => {
+        setResultsOpen(false);
+        
+        // Check if game should end (currentRound is 0-indexed, so check >= maxRounds - 1)
+        if (currentRound >= settings.maxRounds - 1) {
+          endGame();
+        } else {
+          // Move to next round
+          if (isHost || !isMultiplayer) {
+            nextRound();
+          }
+        }
+      }, settings.votingTime * 1000); // Wait for voting to complete
+    }, 300); // Give time for answers to be broadcast and received
   };
 
   const showRoundResults = () => {
@@ -940,6 +970,7 @@ export default function Game() {
     setVotingTimeLeft(0);
     setResults({});
     setVotes({});
+    setAllPlayersAnswers({});
     startNewRound();
   };
 
@@ -995,6 +1026,7 @@ export default function Game() {
     setRoundData(null);
     setResults({});
     setVotes({});
+    setAllPlayersAnswers({});
     setShowResults(false);
     setResultsOpen(false);
     setEarlySubmitCount(0);

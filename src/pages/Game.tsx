@@ -226,6 +226,8 @@ export default function Game() {
   // Refs and hooks
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const joinTsRef = useRef<number>(Date.now());
+  const hostReelectionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { playRoundStart, playVote, playWin } = useGameSounds(soundEnabled);
   const playerName = localStorage.getItem("profileName") || "Player";
   const playerId = useMemo(() => `player_${Date.now()}_${Math.random().toString(36).slice(2)}`, []);
@@ -259,6 +261,10 @@ export default function Game() {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+    if (hostReelectionTimerRef.current) {
+      clearTimeout(hostReelectionTimerRef.current);
+      hostReelectionTimerRef.current = null;
+    }
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
@@ -291,35 +297,84 @@ export default function Game() {
     channelRef.current = channel;
 
     channel
-      .on("presence", { event: "sync" }, () => {
+      .on("presence", { event: "sync" }, async () => {
         const state = channel.presenceState();
-        const playerList = Object.entries(state).map(([id, presences]) => {
-          const presence = presences[0] as any;
+        const entries = Object.entries(state);
+        const playerList = entries.map(([id, presences]) => {
+          const presence = (presences as any[])[0] || {};
           return {
             id,
             name: presence.name || "Player",
-            isHost: presence.isHost || false,
             isReady: presence.isReady || false,
             score: presence.score || 0,
             streak: presence.streak || 0,
             powerUps: presence.powerUps || [...POWER_UPS],
             achievements: presence.achievements || [],
-            roomCreatorId: presence.roomCreatorId
-          };
+            roomCreatorId: presence.roomCreatorId as string | null | undefined,
+            joinTs: typeof presence.joinTs === 'number' ? presence.joinTs : Number.MAX_SAFE_INTEGER,
+          } as any;
         });
         
-        // Find the room creator from existing players or determine first player
-        let actualRoomCreatorId = roomCreatorId;
+        const onlineIds = playerList.map(p => p.id);
+        
+        // Prefer an existing, present room creator if announced by any client
+        let announcedCreator = playerList.find(p => p.roomCreatorId && onlineIds.includes(p.roomCreatorId));
+        let actualRoomCreatorId = announcedCreator?.roomCreatorId || roomCreatorId || null;
+        
+        const hostPresent = actualRoomCreatorId ? onlineIds.includes(actualRoomCreatorId) : false;
+        
         if (!actualRoomCreatorId) {
-          // Check if any player already has roomCreatorId set
-          const existingCreator = playerList.find(p => p.roomCreatorId);
-          if (existingCreator) {
-            actualRoomCreatorId = existingCreator.roomCreatorId;
-          } else {
-            // First player becomes room creator
-            actualRoomCreatorId = playerList[0]?.id || playerId;
+          // Initial election: pick the earliest joinTs; fallback to smallest id
+          const withJoin = playerList.map(p => ({ ...p, joinTs: isFinite((p as any).joinTs) ? (p as any).joinTs : Number.MAX_SAFE_INTEGER }));
+          withJoin.sort((a, b) => ((a as any).joinTs - (b as any).joinTs) || a.id.localeCompare(b.id));
+          const candidateId = withJoin[0]?.id || playerId;
+          actualRoomCreatorId = candidateId;
+          setRoomCreatorId(candidateId);
+          
+          if (candidateId === playerId && channelRef.current) {
+            await channelRef.current.track({
+              name: playerName,
+              isHost: true,
+              isReady: currentPlayer?.isReady ?? false,
+              score: currentPlayer?.score ?? 0,
+              streak: currentPlayer?.streak ?? 0,
+              powerUps: currentPlayer?.powerUps ?? [...POWER_UPS],
+              achievements: currentPlayer?.achievements ?? [],
+              joinTs: joinTsRef.current,
+              roomCreatorId: candidateId,
+            });
           }
-          setRoomCreatorId(actualRoomCreatorId);
+        } else if (!hostPresent) {
+          // Host left -> debounce re-election
+          if (hostReelectionTimerRef.current) {
+            clearTimeout(hostReelectionTimerRef.current);
+          }
+          hostReelectionTimerRef.current = setTimeout(async () => {
+            const withJoin = playerList.map(p => ({ ...p, joinTs: isFinite((p as any).joinTs) ? (p as any).joinTs : Number.MAX_SAFE_INTEGER }));
+            withJoin.sort((a, b) => ((a as any).joinTs - (b as any).joinTs) || a.id.localeCompare(b.id));
+            const candidateId = withJoin[0]?.id || playerId;
+            setRoomCreatorId(candidateId);
+            
+            if (candidateId === playerId && channelRef.current) {
+              await channelRef.current.track({
+                name: playerName,
+                isHost: true,
+                isReady: currentPlayer?.isReady ?? false,
+                score: currentPlayer?.score ?? 0,
+                streak: currentPlayer?.streak ?? 0,
+                powerUps: currentPlayer?.powerUps ?? [...POWER_UPS],
+                achievements: currentPlayer?.achievements ?? [],
+                joinTs: joinTsRef.current,
+                roomCreatorId: candidateId,
+              });
+            }
+          }, 1200);
+        } else {
+          // Host present; ensure no pending re-election
+          if (hostReelectionTimerRef.current) {
+            clearTimeout(hostReelectionTimerRef.current);
+            hostReelectionTimerRef.current = null;
+          }
         }
         
         // Update player list with correct host status - only room creator is host
@@ -327,15 +382,15 @@ export default function Game() {
           ...p,
           isHost: p.id === actualRoomCreatorId
         }));
-        setPlayers(updatedPlayerList);
+        setPlayers(updatedPlayerList as any);
         
-        const currentPlayerData = updatedPlayerList.find(p => p.id === playerId);
+        const iAmHost = actualRoomCreatorId === playerId;
+        setIsHost(iAmHost);
+        const currentPlayerData = updatedPlayerList.find(p => p.id === playerId) as any;
         if (currentPlayerData) {
           setCurrentPlayer(currentPlayerData);
-          const isRoomCreator = actualRoomCreatorId === playerId;
-          setIsHost(isRoomCreator);
-          console.log('Updated host status from presence:', { playerId, roomCreatorId: actualRoomCreatorId, isRoomCreator });
         }
+        console.log('Presence sync → host:', { actualRoomCreatorId, iAmHost, online: onlineIds.length });
       })
       .on("broadcast", { event: "game_state" }, ({ payload }) => {
         handleGameStateUpdate(payload);
@@ -421,32 +476,15 @@ export default function Game() {
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
-          // For first subscription, determine room creator
-          let actualRoomCreatorId = roomCreatorId;
-          let shouldBeHost = false;
-          
-          if (!actualRoomCreatorId) {
-            // This player becomes the room creator
-            actualRoomCreatorId = playerId;
-            setRoomCreatorId(actualRoomCreatorId);
-            shouldBeHost = true;
-          } else {
-            // Check if this player is the room creator
-            shouldBeHost = actualRoomCreatorId === playerId;
-          }
-          
-          setIsHost(shouldBeHost);
-          console.log('Host status set:', { playerId, roomCreatorId: actualRoomCreatorId, shouldBeHost });
-          
+          // Track initial presence with a stable join timestamp. Host election happens on presence sync.
           await channel.track({
             name: playerName,
-            isHost: shouldBeHost,
             isReady: false,
             score: 0,
             streak: 0,
             powerUps: [...POWER_UPS],
             achievements: [],
-            roomCreatorId: actualRoomCreatorId
+            joinTs: joinTsRef.current,
           });
         }
       });
@@ -496,16 +534,17 @@ export default function Game() {
     // Update current player state locally first
     setCurrentPlayer(prev => prev ? { ...prev, isReady: newReady } : null);
     
-    await channelRef.current.track({
-      name: playerName,
-      isHost: roomCreatorId === playerId,
-      isReady: newReady,
-      score: currentPlayer.score || 0,
-      streak: currentPlayer.streak || 0,
-      powerUps: currentPlayer.powerUps || [...POWER_UPS],
-      achievements: currentPlayer.achievements || [],
-      roomCreatorId: roomCreatorId
-    });
+      await channelRef.current.track({
+        name: playerName,
+        isHost: roomCreatorId === playerId,
+        isReady: newReady,
+        score: currentPlayer.score || 0,
+        streak: currentPlayer.streak || 0,
+        powerUps: currentPlayer.powerUps || [...POWER_UPS],
+        achievements: currentPlayer.achievements || [],
+        joinTs: joinTsRef.current,
+        roomCreatorId: roomCreatorId
+      });
   };
 
   const startMatch = () => {
@@ -1084,6 +1123,7 @@ export default function Game() {
         streak: currentPlayer.streak || 0,
         powerUps: updatedPowerUps,
         achievements: currentPlayer.achievements || [],
+        joinTs: joinTsRef.current,
         roomCreatorId: roomCreatorId
       });
     }

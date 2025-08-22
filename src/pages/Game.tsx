@@ -1283,111 +1283,202 @@ export default function Game() {
   const renderLobby = () => (
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2 space-y-6">
-        {/* Room Info */}
-        <Card className="glass-panel border">
+        {/* Enhanced Room Info with gradient header */}
+        <Card className="glass-panel border overflow-hidden">
+          <div className="h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
-                  {isMultiplayer ? <Users className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-                  {isMultiplayer ? `Room ${roomCode}` : "Solo Game"}
+                <CardTitle className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-lg">
+                    {isMultiplayer ? <Users className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <div className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                      {isMultiplayer ? `Room ${roomCode}` : "Solo Adventure"}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {isMultiplayer ? `${players.length}/${settings.maxPlayers} warriors assembled` : "Master your skills"}
+                    </p>
+                  </div>
                 </CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {isMultiplayer ? `${players.length}/${settings.maxPlayers} players` : "Practice mode"}
-                </p>
               </div>
               <div className="flex items-center gap-2">
                 {isMultiplayer && (
-                  <Button variant="outline" size="sm" onClick={copyRoomCode} className="glass-card">
-                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  <Button variant="outline" size="sm" onClick={copyRoomCode} className="glass-card hover:scale-105 transition-transform">
+                    {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                    {copied ? "Copied!" : "Share"}
                   </Button>
                 )}
                 {(isHost || (!isMultiplayer) || (roomCreatorId === playerId)) && (
-                  <Button variant="outline" size="sm" onClick={() => setShowSettings(true)} className="glass-card">
+                  <Button variant="outline" size="sm" onClick={() => setShowSettings(true)} className="glass-card hover:scale-105 transition-transform">
                     <Settings className="w-4 h-4" />
+                    Settings
                   </Button>
                 )}
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            {/* Players List */}
+            {/* Enhanced Players List */}
             <div className="space-y-3">
-              {players.map(player => (
-                <div key={player.id} className="flex items-center justify-between p-3 rounded-lg glass-card border">
-                  <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarFallback style={{ backgroundImage: gradientFromString(player.name), color: "white" }}>
-                        {initialsFromName(player.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{player.name}</span>
-                        {player.isHost && <Crown className="w-4 h-4 text-yellow-500" />}
-                        {player.streak && player.streak > 0 && (
-                          <Badge variant="secondary" className="text-xs">
-                            <Flame className="w-3 h-3 mr-1" />
-                            {player.streak}
-                          </Badge>
+              {players.map((player, index) => (
+                <div key={player.id} className="group relative p-4 rounded-xl glass-card border hover:shadow-lg transition-all duration-300 animate-fade-in" style={{animationDelay: `${index * 100}ms`}}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="relative">
+                        <Avatar className="w-12 h-12 ring-2 ring-white/20 shadow-lg">
+                          <AvatarFallback style={{ backgroundImage: gradientFromString(player.name), color: "white" }} className="text-lg font-bold">
+                            {initialsFromName(player.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        {player.isHost && (
+                          <div className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-1 animate-pulse">
+                            <Crown className="w-3 h-3 text-white" />
+                          </div>
                         )}
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        Score: {player.score || 0}
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-lg">{player.name}</span>
+                          {player.streak && player.streak > 0 && (
+                            <Badge variant="secondary" className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 animate-pulse">
+                              <Flame className="w-3 h-3 mr-1" />
+                              {player.streak} streak!
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Trophy className="w-3 h-3" />
+                            <span className="font-medium">{player.score || 0} points</span>
+                          </div>
+                          {player.achievements && player.achievements.length > 0 && (
+                            <div className="flex items-center gap-1">
+                              <Star className="w-3 h-3 text-yellow-500" />
+                              <span>{player.achievements.length} achievements</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {isMultiplayer && (
-                      <Badge variant={player.isReady ? "default" : "secondary"}>
-                        {player.isReady ? "Ready" : "Not Ready"}
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-3">
+                      {isMultiplayer && (
+                        <Badge 
+                          variant={player.isReady ? "default" : "secondary"}
+                          className={`transition-all duration-300 ${
+                            player.isReady 
+                              ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white animate-pulse" 
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          <div className="flex items-center gap-1">
+                            {player.isReady ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                            {player.isReady ? "Ready!" : "Waiting"}
+                          </div>
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Ready/Start Controls */}
-            <div className="mt-6 flex items-center justify-between">
+            {/* Enhanced Ready/Start Controls */}
+            <div className="mt-8 flex items-center justify-center">
               {isMultiplayer && !isHost && (
-                <Button onClick={toggleReady} variant={currentPlayer?.isReady ? "secondary" : "default"} className="glass-card">
-                  {currentPlayer?.isReady ? "Not Ready" : "Ready Up"}
+                <Button 
+                  onClick={toggleReady} 
+                  variant={currentPlayer?.isReady ? "secondary" : "default"} 
+                  className={`px-8 py-3 text-lg font-semibold glass-card hover:scale-105 transition-all duration-300 ${
+                    currentPlayer?.isReady 
+                      ? "bg-gradient-to-r from-red-500 to-pink-500 text-white hover:from-red-600 hover:to-pink-600" 
+                      : "bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 animate-pulse"
+                  }`}
+                >
+                  {currentPlayer?.isReady ? (
+                    <>
+                      <StopCircle className="w-5 h-5 mr-2" />
+                      Cancel Ready
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-5 h-5 mr-2" />
+                      Ready to Battle!
+                    </>
+                  )}
                 </Button>
               )}
               {((!isMultiplayer && isHost) || (isMultiplayer && roomCreatorId === playerId)) && (
-                <Button onClick={startMatch} className="glass-card hover:scale-105">
-                  <Play className="w-4 h-4 mr-2" />
-                  Start Match
+                <Button 
+                  onClick={startMatch} 
+                  className="px-12 py-4 text-xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white hover:scale-110 hover:shadow-2xl transition-all duration-300 animate-pulse border-0"
+                >
+                  <Play className="w-6 h-6 mr-3" />
+                  Begin Adventure!
+                  <Sparkles className="w-6 h-6 ml-3" />
                 </Button>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Game Preview */}
-        <Card className="glass-panel border">
+        {/* Enhanced Game Preview */}
+        <Card className="glass-panel border overflow-hidden">
+          <div className="h-1 bg-gradient-to-r from-green-400 to-blue-500"></div>
           <CardHeader>
-            <CardTitle>Game Settings</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-blue-500" />
+              Battle Configuration
+            </CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-muted-foreground">Round Time:</span>
-              <span className="ml-2 font-medium">{settings.roundTime}s</span>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Timer className="w-3 h-3" />
+                  Battle Duration
+                </div>
+                <div className="text-lg font-bold text-blue-600">{settings.roundTime}s per round</div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Trophy className="w-3 h-3" />
+                  Total Rounds
+                </div>
+                <div className="text-lg font-bold text-purple-600">{settings.maxRounds} battles</div>
+              </div>
+              <div className="space-y-1 col-span-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Sparkles className="w-3 h-3" />
+                  Category Pack
+                </div>
+                <div className="text-lg font-bold text-green-600">
+                  {CATEGORY_LISTS.find(l => l.id === settings.categoryList)?.name || "Random Mix"}
+                </div>
+              </div>
             </div>
-            <div>
-              <span className="text-muted-foreground">Max Rounds:</span>
-              <span className="ml-2 font-medium">{settings.maxRounds}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Category List:</span>
-              <span className="ml-2 font-medium">
-                {CATEGORY_LISTS.find(l => l.id === settings.categoryList)?.name || "Random"}
-              </span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Power-ups:</span>
-              <span className="ml-2 font-medium">{settings.enablePowerUps ? "Enabled" : "Disabled"}</span>
+            
+            {/* Feature indicators */}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {settings.enablePowerUps && (
+                <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0">
+                  <Zap className="w-3 h-3 mr-1" />
+                  Power-ups Active
+                </Badge>
+              )}
+              {settings.allowEarlySubmit && (
+                <Badge className="bg-gradient-to-r from-blue-400 to-cyan-500 text-white border-0">
+                  <FastForward className="w-3 h-3 mr-1" />
+                  Quick Submit
+                </Badge>
+              )}
+              {settings.enableAchievements && (
+                <Badge className="bg-gradient-to-r from-purple-400 to-pink-500 text-white border-0">
+                  <Star className="w-3 h-3 mr-1" />
+                  Achievements
+                </Badge>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1525,71 +1616,165 @@ export default function Game() {
             </CardContent>
           </Card>
 
-          {/* Power-ups */}
+          {/* Enhanced Power-ups Arsenal */}
           {settings.enablePowerUps && currentPlayer?.powerUps && (
-            <Card className="glass-panel border">
+            <Card className="glass-panel border overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 animate-pulse"></div>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-yellow-500" />
-                  Power-ups
+                  <div className="p-2 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg shadow-lg animate-pulse">
+                    <Zap className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent font-black">
+                    Magical Arsenal
+                  </span>
                 </CardTitle>
+                <p className="text-sm text-muted-foreground">Channel ancient powers to gain the upper hand</p>
               </CardHeader>
               <CardContent>
-                <div className="flex gap-2 flex-wrap">
-                  {currentPlayer.powerUps.map(powerUp => (
-                    <Button
-                      key={powerUp.id}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => usePowerUp(powerUp.id)}
-                      disabled={powerUp.uses >= powerUp.maxUses || activePowerUps.has(powerUp.id)}
-                      className={`glass-card ${activePowerUps.has(powerUp.id) ? 'animate-pulse bg-yellow-100' : ''}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        {powerUp.type === "time_freeze" && <Timer className="w-4 h-4" />}
-                        {powerUp.type === "double_points" && <Star className="w-4 h-4" />}
-                        {powerUp.type === "peek" && <Eye className="w-4 h-4" />}
-                        {powerUp.type === "shield" && <Shield className="w-4 h-4" />}
-                        {powerUp.type === "lightning" && <Zap className="w-4 h-4" />}
-                        <span>{powerUp.name}</span>
-                        <Badge variant="secondary" className="text-xs">
-                          {powerUp.maxUses - powerUp.uses}
-                        </Badge>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {currentPlayer.powerUps.map((powerUp, index) => {
+                    const isActive = activePowerUps.has(powerUp.id);
+                    const isAvailable = powerUp.uses < powerUp.maxUses;
+                    const remaining = powerUp.maxUses - powerUp.uses;
+                    
+                    return (
+                      <div key={powerUp.id} className="group">
+                        <Button
+                          variant="outline"
+                          onClick={() => usePowerUp(powerUp.id)}
+                          disabled={!isAvailable || isActive}
+                          className={`w-full p-4 h-auto glass-card transition-all duration-300 hover:scale-105 ${
+                            isActive 
+                              ? 'animate-pulse bg-gradient-to-br from-yellow-100 to-orange-100 border-yellow-400' 
+                              : isAvailable 
+                                ? 'hover:bg-gradient-to-br hover:from-blue-50 hover:to-purple-50 hover:border-blue-400' 
+                                : 'opacity-50 cursor-not-allowed'
+                          }`}
+                        >
+                          <div className="flex flex-col items-center gap-2 w-full">
+                            <div className={`p-2 rounded-lg ${
+                              powerUp.type === "time_freeze" ? 'bg-gradient-to-br from-blue-400 to-cyan-500' :
+                              powerUp.type === "double_points" ? 'bg-gradient-to-br from-yellow-400 to-orange-500' :
+                              powerUp.type === "peek" ? 'bg-gradient-to-br from-purple-400 to-pink-500' :
+                              powerUp.type === "shield" ? 'bg-gradient-to-br from-green-400 to-emerald-500' :
+                              'bg-gradient-to-br from-red-400 to-pink-500'
+                            } text-white shadow-lg ${isActive ? 'animate-spin' : ''}`}>
+                              {powerUp.type === "time_freeze" && <Timer className="w-5 h-5" />}
+                              {powerUp.type === "double_points" && <Star className="w-5 h-5" />}
+                              {powerUp.type === "peek" && <Eye className="w-5 h-5" />}
+                              {powerUp.type === "shield" && <Shield className="w-5 h-5" />}
+                              {powerUp.type === "lightning" && <Zap className="w-5 h-5" />}
+                            </div>
+                            
+                            <div className="text-center">
+                              <div className="font-bold text-sm">{powerUp.name}</div>
+                              <div className="text-xs text-muted-foreground line-clamp-2">
+                                {powerUp.description}
+                              </div>
+                            </div>
+                            
+                            <Badge 
+                              variant="secondary" 
+                              className={`text-xs font-bold ${
+                                remaining > 0 
+                                  ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' 
+                                  : 'bg-gray-400 text-white'
+                              }`}
+                            >
+                              {remaining > 0 ? `${remaining} uses` : 'Depleted'}
+                            </Badge>
+                          </div>
+                        </Button>
                       </div>
-                    </Button>
-                  ))}
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
           )}
 
-          {/* Categories */}
-          <Card className="glass-panel border">
+          {/* Enhanced Categories */}
+          <Card className="glass-panel border overflow-hidden">
+            <div className="h-1 bg-gradient-to-r from-green-400 to-blue-500"></div>
             <CardHeader>
-              <CardTitle>Categories</CardTitle>
-              {roundData.submitted && (
-                <Badge variant="secondary" className="w-fit">
-                  <CheckCircle2 className="w-4 h-4 mr-1" />
-                  Submitted
-                </Badge>
-              )}
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-purple-500" />
+                  Categories of Power
+                </CardTitle>
+                {roundData.submitted && (
+                  <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 animate-pulse">
+                    <CheckCircle2 className="w-4 h-4 mr-1" />
+                    Spell Cast!
+                  </Badge>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {roundData.categories.map((category, index) => (
-                  <div key={index} className="space-y-2">
-                    <Label className="text-sm font-medium">
-                      {index + 1}. {category}
-                    </Label>
-                    <Input
-                      value={roundData.answers[index] || ""}
-                      onChange={(e) => updateAnswer(index, e.target.value)}
-                      placeholder={`${roundData.letter}...`}
-                      disabled={roundData.submitted || isPaused}
-                      className="glass-card"
-                    />
-                  </div>
-                ))}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {roundData.categories.map((category, index) => {
+                  const hasAnswer = roundData.answers[index]?.trim();
+                  const isComplete = hasAnswer && hasAnswer.toLowerCase().startsWith(roundData.letter.toLowerCase());
+                  
+                  return (
+                    <div key={index} className="group space-y-3">
+                      <Label className="text-sm font-bold flex items-center gap-2">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                          isComplete 
+                            ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' 
+                            : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
+                        }`}>
+                          {index + 1}
+                        </div>
+                        {category}
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          value={roundData.answers[index] || ""}
+                          onChange={(e) => updateAnswer(index, e.target.value)}
+                          placeholder={`${roundData.letter}...`}
+                          disabled={roundData.submitted || isPaused}
+                          className={`glass-card transition-all duration-300 ${
+                            isComplete 
+                              ? 'border-green-500 bg-green-50/50 dark:bg-green-950/20' 
+                              : hasAnswer 
+                                ? 'border-yellow-500 bg-yellow-50/50 dark:bg-yellow-950/20' 
+                                : 'hover:border-blue-400'
+                          }`}
+                        />
+                        {isComplete && (
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                            <CheckCircle2 className="w-4 h-4 text-green-500 animate-pulse" />
+                          </div>
+                        )}
+                        {hasAnswer && !isComplete && (
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                            <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* Progress indicator */}
+              <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">Progress</span>
+                  <span className="text-sm font-bold text-purple-700 dark:text-purple-300">
+                    {Object.values(roundData.answers).filter(a => a?.trim()).length}/{roundData.categories.length}
+                  </span>
+                </div>
+                <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                  <div 
+                    className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-500"
+                    style={{ 
+                      width: `${(Object.values(roundData.answers).filter(a => a?.trim()).length / roundData.categories.length) * 100}%` 
+                    }}
+                  ></div>
+                </div>
               </div>
             </CardContent>
           </Card>

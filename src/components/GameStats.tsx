@@ -50,78 +50,77 @@ export const GameStats: React.FC<GameStatsProps> = ({
   const performance = getPerformanceRating();
 
   return (
-    <Card className="glass-panel border overflow-hidden">
-      <div className="h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
+    <Card className="border">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Award className="w-5 h-5 text-purple-500" />
+          <Award className="w-5 h-5 text-primary" />
           Player Statistics
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Performance Rating */}
-        <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 rounded-lg">
-          <div className={`text-2xl font-black bg-gradient-to-r ${performance.color} bg-clip-text text-transparent`}>
+        <div className="text-center p-4 bg-muted/30 rounded-lg">
+          <div className="text-xl font-bold text-primary">
             {performance.label}
           </div>
           <div className="text-sm text-muted-foreground">Current Rating</div>
         </div>
 
         {/* Key Stats Grid */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           {/* Current Score */}
-          <div className="p-3 rounded-lg bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-200 dark:border-blue-800">
+          <div className="p-3 rounded-lg bg-muted/30 border">
             <div className="flex items-center gap-2 mb-1">
-              <Trophy className="w-4 h-4 text-blue-500" />
-              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Current Score</span>
+              <Trophy className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">Current Score</span>
             </div>
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            <div className="text-xl font-bold">
               {currentScore}
             </div>
           </div>
 
           {/* Best Score */}
-          <div className="p-3 rounded-lg bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-200 dark:border-yellow-800">
+          <div className="p-3 rounded-lg bg-muted/30 border">
             <div className="flex items-center gap-2 mb-1">
-              <Star className="w-4 h-4 text-yellow-500" />
-              <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">Best Score</span>
+              <Star className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">Best Score</span>
             </div>
-            <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+            <div className="text-xl font-bold">
               {bestScore}
             </div>
           </div>
 
           {/* Win Rate */}
-          <div className="p-3 rounded-lg bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-200 dark:border-green-800">
+          <div className="p-3 rounded-lg bg-muted/30 border">
             <div className="flex items-center gap-2 mb-1">
-              <Target className="w-4 h-4 text-green-500" />
-              <span className="text-sm font-medium text-green-700 dark:text-green-300">Win Rate</span>
+              <Target className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">Win Rate</span>
             </div>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+            <div className="text-xl font-bold">
               {winRate}%
             </div>
           </div>
 
           {/* Average Time */}
-          <div className="p-3 rounded-lg bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-200 dark:border-purple-800">
+          <div className="p-3 rounded-lg bg-muted/30 border">
             <div className="flex items-center gap-2 mb-1">
-              <Clock className="w-4 h-4 text-purple-500" />
-              <span className="text-sm font-medium text-purple-700 dark:text-purple-300">Avg Time</span>
+              <Clock className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">Avg Time</span>
             </div>
-            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+            <div className="text-xl font-bold">
               {formatTime(averageTime)}
             </div>
           </div>
         </div>
 
         {/* Streak Indicator */}
-        <div className="p-4 rounded-lg bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20 border border-orange-200 dark:border-orange-800">
+        <div className="p-4 rounded-lg bg-muted/30 border">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <Flame className="w-4 h-4 text-orange-500" />
+              <Flame className="w-4 h-4 text-primary" />
               <span className="text-sm font-medium">Win Streak</span>
             </div>
-            <Badge className={`bg-gradient-to-r ${getStreakColor(streak)} text-white border-0`}>
+            <Badge variant="secondary">
               {streak > 0 ? `${streak} wins!` : 'No streak'}
             </Badge>
           </div>

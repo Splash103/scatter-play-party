@@ -46,47 +46,29 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
 
   return (
     <div className="fixed top-4 right-4 z-50 animate-scale-in">
-      <Card className="glass-panel border-0 bg-gradient-to-br from-purple-500/90 to-pink-500/90 backdrop-blur-lg shadow-2xl max-w-sm">
+      <Card className="bg-primary text-primary-foreground shadow-lg max-w-sm border">
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
-            <div className="p-2 bg-white/20 rounded-lg shadow-lg">
+            <div className="p-2 bg-primary-foreground/20 rounded-lg">
               {getIcon(achievement.icon)}
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
-                <Sparkles className="w-4 h-4 text-yellow-300 animate-pulse" />
-                <span className="text-sm font-bold text-white/90 uppercase tracking-wider">
+                <Sparkles className="w-4 h-4" />
+                <span className="text-sm font-semibold uppercase tracking-wide">
                   Achievement Unlocked!
                 </span>
               </div>
-              <h3 className="font-black text-white text-lg leading-tight">
+              <h3 className="font-bold text-lg leading-tight">
                 {achievement.name}
               </h3>
-              <p className="text-white/80 text-sm mt-1">
+              <p className="text-primary-foreground/80 text-sm mt-1">
                 {achievement.description}
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
-      
-      {/* Celebration effects */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {[...Array(8)].map((_, i) => (
-          <div 
-            key={i}
-            className="absolute animate-ping"
-            style={{
-              top: `${Math.random() * 100}%`,
-              left: `${Math.random() * 100}%`,
-              animationDelay: `${i * 0.2}s`,
-              animationDuration: '2s'
-            }}
-          >
-            <Star className="w-3 h-3 text-yellow-400" />
-          </div>
-        ))}
-      </div>
     </div>
   );
 };

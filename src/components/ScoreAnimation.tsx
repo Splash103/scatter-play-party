@@ -52,21 +52,21 @@ export const ScoreAnimation: React.FC<ScoreAnimationProps> = ({
 
   return (
     <div className="relative">
-      <Card className={`glass-panel border transition-all duration-500 ${
-        isWinner ? 'ring-2 ring-yellow-400 shadow-xl animate-pulse' : ''
+      <Card className={`border transition-all duration-300 ${
+        isWinner ? 'ring-2 ring-primary shadow-lg' : ''
       }`}>
-        <CardContent className="p-6">
+        <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-white ${
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                 isWinner 
-                  ? 'bg-gradient-to-br from-yellow-400 to-orange-500 animate-pulse' 
-                  : 'bg-gradient-to-br from-blue-500 to-purple-600'
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-secondary text-secondary-foreground'
               }`}>
-                {isWinner ? <Crown className="w-6 h-6" /> : <Trophy className="w-6 h-6" />}
+                {isWinner ? <Crown className="w-5 h-5" /> : <Trophy className="w-5 h-5" />}
               </div>
               <div>
-                <div className="font-bold text-lg">{playerName}</div>
+                <div className="font-semibold text-lg">{playerName}</div>
                 <div className="text-sm text-muted-foreground">
                   {achievements.length > 0 && `${achievements.length} achievements`}
                 </div>
@@ -74,9 +74,7 @@ export const ScoreAnimation: React.FC<ScoreAnimationProps> = ({
             </div>
             
             <div className="text-right">
-              <div className={`text-3xl font-black ${
-                isWinner ? 'text-yellow-500' : 'text-blue-600'
-              }`}>
+              <div className="text-2xl font-bold text-primary">
                 {Math.round(animatedScore)}
               </div>
               <div className="text-sm text-muted-foreground">points</div>
@@ -85,19 +83,19 @@ export const ScoreAnimation: React.FC<ScoreAnimationProps> = ({
           
           {/* Achievements */}
           {achievements.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-1">
+            <div className="mt-3 flex flex-wrap gap-1">
               {achievements.slice(0, 3).map((achievement, index) => (
                 <Badge 
                   key={index}
-                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 text-xs animate-fade-in"
-                  style={{ animationDelay: `${index * 200}ms` }}
+                  variant="secondary"
+                  className="text-xs"
                 >
                   <Star className="w-3 h-3 mr-1" />
                   {achievement.name}
                 </Badge>
               ))}
               {achievements.length > 3 && (
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="outline" className="text-xs">
                   +{achievements.length - 3} more
                 </Badge>
               )}
@@ -108,31 +106,11 @@ export const ScoreAnimation: React.FC<ScoreAnimationProps> = ({
       
       {/* Score increase animation */}
       {showScoreUp && scoreDiff > 0 && (
-        <div className="absolute -top-8 right-4 animate-fade-in">
-          <div className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg animate-bounce">
+        <div className="absolute -top-6 right-4 animate-fade-in">
+          <div className="bg-primary text-primary-foreground px-2 py-1 rounded text-sm font-medium shadow">
             +{scoreDiff}
           </div>
         </div>
-      )}
-      
-      {/* Winner celebration effects */}
-      {isWinner && (
-        <>
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-2 left-2 animate-ping">
-              <Star className="w-4 h-4 text-yellow-400" />
-            </div>
-            <div className="absolute top-2 right-2 animate-ping" style={{ animationDelay: '0.5s' }}>
-              <Star className="w-4 h-4 text-yellow-400" />
-            </div>
-            <div className="absolute bottom-2 left-2 animate-ping" style={{ animationDelay: '1s' }}>
-              <Star className="w-4 h-4 text-yellow-400" />
-            </div>
-            <div className="absolute bottom-2 right-2 animate-ping" style={{ animationDelay: '1.5s' }}>
-              <Star className="w-4 h-4 text-yellow-400" />
-            </div>
-          </div>
-        </>
       )}
     </div>
   );

@@ -1305,13 +1305,13 @@ export default function Game() {
               </div>
               <div className="flex items-center gap-2">
                 {isMultiplayer && (
-                  <Button variant="outline" size="sm" onClick={copyRoomCode} className="glass-card hover:scale-105 transition-transform">
-                    {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                    <Button variant="outline" size="sm" onClick={copyRoomCode} className="transition-transform hover:scale-105">
+                      {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                     {copied ? "Copied!" : "Share"}
                   </Button>
                 )}
                 {(isHost || (!isMultiplayer) || (roomCreatorId === playerId)) && (
-                  <Button variant="outline" size="sm" onClick={() => setShowSettings(true)} className="glass-card hover:scale-105 transition-transform">
+                  <Button variant="outline" size="sm" onClick={() => setShowSettings(true)} className="transition-transform hover:scale-105">
                     <Settings className="w-4 h-4" />
                     Settings
                   </Button>
@@ -1323,7 +1323,7 @@ export default function Game() {
             {/* Enhanced Players List */}
             <div className="space-y-3">
               {players.map((player, index) => (
-                <div key={player.id} className="group relative p-4 rounded-xl glass-card border hover:shadow-lg transition-all duration-300 animate-fade-in" style={{animationDelay: `${index * 100}ms`}}>
+                <div key={player.id} className="group relative p-4 rounded-xl border hover:shadow-md transition-all duration-200 animate-fade-in" style={{animationDelay: `${index * 100}ms`}}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className="relative">
@@ -1390,7 +1390,7 @@ export default function Game() {
                 <Button 
                   onClick={toggleReady} 
                   variant={currentPlayer?.isReady ? "secondary" : "default"} 
-                  className={`px-8 py-3 text-lg font-semibold glass-card hover:scale-105 transition-all duration-300 ${
+                  className="transition-colors hover:scale-105"
                     currentPlayer?.isReady 
                       ? "bg-gradient-to-r from-red-500 to-pink-500 text-white hover:from-red-600 hover:to-pink-600" 
                       : "bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 animate-pulse"
@@ -1616,20 +1616,19 @@ export default function Game() {
             </CardContent>
           </Card>
 
-          {/* Enhanced Power-ups Arsenal */}
+          {/* Power-ups */}
           {settings.enablePowerUps && currentPlayer?.powerUps && (
-            <Card className="glass-panel border overflow-hidden">
-              <div className="h-1 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 animate-pulse"></div>
+            <Card className="border">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <div className="p-2 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg shadow-lg animate-pulse">
-                    <Zap className="w-5 h-5 text-white" />
+                  <div className="p-2 bg-primary rounded-lg">
+                    <Zap className="w-5 h-5 text-primary-foreground" />
                   </div>
-                  <span className="bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent font-black">
-                    Magical Arsenal
+                  <span className="font-semibold">
+                    Power-ups
                   </span>
                 </CardTitle>
-                <p className="text-sm text-muted-foreground">Channel ancient powers to gain the upper hand</p>
+                <p className="text-sm text-muted-foreground">Use special abilities to gain an advantage</p>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -1644,22 +1643,18 @@ export default function Game() {
                           variant="outline"
                           onClick={() => usePowerUp(powerUp.id)}
                           disabled={!isAvailable || isActive}
-                          className={`w-full p-4 h-auto glass-card transition-all duration-300 hover:scale-105 ${
+                          className={`w-full p-4 h-auto transition-colors ${
                             isActive 
-                              ? 'animate-pulse bg-gradient-to-br from-yellow-100 to-orange-100 border-yellow-400' 
+                              ? 'bg-primary/10 border-primary' 
                               : isAvailable 
-                                ? 'hover:bg-gradient-to-br hover:from-blue-50 hover:to-purple-50 hover:border-blue-400' 
+                                ? 'hover:bg-muted' 
                                 : 'opacity-50 cursor-not-allowed'
                           }`}
                         >
                           <div className="flex flex-col items-center gap-2 w-full">
                             <div className={`p-2 rounded-lg ${
-                              powerUp.type === "time_freeze" ? 'bg-gradient-to-br from-blue-400 to-cyan-500' :
-                              powerUp.type === "double_points" ? 'bg-gradient-to-br from-yellow-400 to-orange-500' :
-                              powerUp.type === "peek" ? 'bg-gradient-to-br from-purple-400 to-pink-500' :
-                              powerUp.type === "shield" ? 'bg-gradient-to-br from-green-400 to-emerald-500' :
-                              'bg-gradient-to-br from-red-400 to-pink-500'
-                            } text-white shadow-lg ${isActive ? 'animate-spin' : ''}`}>
+                              isAvailable ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground text-muted'
+                            }`}>
                               {powerUp.type === "time_freeze" && <Timer className="w-5 h-5" />}
                               {powerUp.type === "double_points" && <Star className="w-5 h-5" />}
                               {powerUp.type === "peek" && <Eye className="w-5 h-5" />}
@@ -1668,19 +1663,15 @@ export default function Game() {
                             </div>
                             
                             <div className="text-center">
-                              <div className="font-bold text-sm">{powerUp.name}</div>
+                              <div className="font-semibold text-sm">{powerUp.name}</div>
                               <div className="text-xs text-muted-foreground line-clamp-2">
                                 {powerUp.description}
                               </div>
                             </div>
                             
                             <Badge 
-                              variant="secondary" 
-                              className={`text-xs font-bold ${
-                                remaining > 0 
-                                  ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' 
-                                  : 'bg-gray-400 text-white'
-                              }`}
+                              variant={remaining > 0 ? "default" : "secondary"}
+                              className="text-xs"
                             >
                               {remaining > 0 ? `${remaining} uses` : 'Depleted'}
                             </Badge>
@@ -1694,19 +1685,18 @@ export default function Game() {
             </Card>
           )}
 
-          {/* Enhanced Categories */}
-          <Card className="glass-panel border overflow-hidden">
-            <div className="h-1 bg-gradient-to-r from-green-400 to-blue-500"></div>
+          {/* Categories */}
+          <Card className="border">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-purple-500" />
-                  Categories of Power
+                  <Sparkles className="w-5 h-5 text-primary" />
+                  Categories
                 </CardTitle>
                 {roundData.submitted && (
-                  <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 animate-pulse">
+                  <Badge variant="secondary">
                     <CheckCircle2 className="w-4 h-4 mr-1" />
-                    Spell Cast!
+                    Submitted
                   </Badge>
                 )}
               </div>
@@ -1735,17 +1725,17 @@ export default function Game() {
                           onChange={(e) => updateAnswer(index, e.target.value)}
                           placeholder={`${roundData.letter}...`}
                           disabled={roundData.submitted || isPaused}
-                          className={`glass-card transition-all duration-300 ${
+                          className={`transition-colors ${
                             isComplete 
-                              ? 'border-green-500 bg-green-50/50 dark:bg-green-950/20' 
+                              ? 'border-green-500 bg-green-50 dark:bg-green-950/20' 
                               : hasAnswer 
-                                ? 'border-yellow-500 bg-yellow-50/50 dark:bg-yellow-950/20' 
-                                : 'hover:border-blue-400'
+                                ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20' 
+                                : ''
                           }`}
                         />
                         {isComplete && (
                           <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                            <CheckCircle2 className="w-4 h-4 text-green-500 animate-pulse" />
+                            <CheckCircle2 className="w-4 h-4 text-green-500" />
                           </div>
                         )}
                         {hasAnswer && !isComplete && (
@@ -1760,21 +1750,17 @@ export default function Game() {
               </div>
               
               {/* Progress indicator */}
-              <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="mt-6 p-4 bg-muted/30 rounded-lg border">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">Progress</span>
-                  <span className="text-sm font-bold text-purple-700 dark:text-purple-300">
+                  <span className="text-sm font-medium">Progress</span>
+                  <span className="text-sm font-semibold">
                     {Object.values(roundData.answers).filter(a => a?.trim()).length}/{roundData.categories.length}
                   </span>
                 </div>
-                <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
-                  <div 
-                    className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-500"
-                    style={{ 
-                      width: `${(Object.values(roundData.answers).filter(a => a?.trim()).length / roundData.categories.length) * 100}%` 
-                    }}
-                  ></div>
-                </div>
+                <Progress 
+                  value={(Object.values(roundData.answers).filter(a => a?.trim()).length / roundData.categories.length) * 100}
+                  className="h-2"
+                />
               </div>
             </CardContent>
           </Card>
@@ -1783,7 +1769,7 @@ export default function Game() {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Players Status */}
-          <Card className="glass-panel border">
+          <Card className="border">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="w-5 h-5" />

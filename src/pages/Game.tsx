@@ -1285,16 +1285,16 @@ export default function Game() {
       <div className="lg:col-span-2 space-y-6">
         {/* Enhanced Room Info with gradient header */}
         <Card className="glass-panel border overflow-hidden">
-          <div className="h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+          <div className="h-2 bg-primary"></div>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-lg">
+                  <div className="p-2 rounded-lg bg-primary text-primary-foreground shadow-lg">
                     {isMultiplayer ? <Users className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                   </div>
                   <div>
-                    <div className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    <div className="text-xl font-bold text-primary">
                       {isMultiplayer ? `Room ${roomCode}` : "Solo Adventure"}
                     </div>
                     <p className="text-sm text-muted-foreground">
@@ -1342,7 +1342,7 @@ export default function Game() {
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-semibold text-lg">{player.name}</span>
                           {player.streak && player.streak > 0 && (
-                            <Badge variant="secondary" className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 animate-pulse">
+                            <Badge variant="destructive" className="border-0">
                               <Flame className="w-3 h-3 mr-1" />
                               {player.streak} streak!
                             </Badge>
@@ -1368,7 +1368,7 @@ export default function Game() {
                           variant={player.isReady ? "default" : "secondary"}
                           className={`transition-all duration-300 ${
                             player.isReady 
-                              ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white animate-pulse" 
+                              ? "bg-primary text-primary-foreground" 
                               : "bg-muted text-muted-foreground"
                           }`}
                         >
@@ -1391,10 +1391,6 @@ export default function Game() {
                   onClick={toggleReady} 
                   variant={currentPlayer?.isReady ? "secondary" : "default"} 
                   className="transition-colors hover:scale-105"
-                    currentPlayer?.isReady 
-                      ? "bg-gradient-to-r from-red-500 to-pink-500 text-white hover:from-red-600 hover:to-pink-600" 
-                      : "bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 animate-pulse"
-                  }`}
                 >
                   {currentPlayer?.isReady ? (
                     <>
@@ -1412,7 +1408,7 @@ export default function Game() {
               {((!isMultiplayer && isHost) || (isMultiplayer && roomCreatorId === playerId)) && (
                 <Button 
                   onClick={startMatch} 
-                  className="px-12 py-4 text-xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white hover:scale-110 hover:shadow-2xl transition-all duration-300 animate-pulse border-0"
+                  className="px-12 py-4 text-xl font-bold transition-all duration-300"
                 >
                   <Play className="w-6 h-6 mr-3" />
                   Begin Adventure!
@@ -1425,7 +1421,7 @@ export default function Game() {
 
         {/* Enhanced Game Preview */}
         <Card className="glass-panel border overflow-hidden">
-          <div className="h-1 bg-gradient-to-r from-green-400 to-blue-500"></div>
+          <div className="h-1 bg-secondary"></div>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Target className="w-5 h-5 text-blue-500" />
@@ -1462,19 +1458,19 @@ export default function Game() {
             {/* Feature indicators */}
             <div className="mt-4 flex flex-wrap gap-2">
               {settings.enablePowerUps && (
-                <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0">
+                <Badge className="bg-accent text-accent-foreground border-0">
                   <Zap className="w-3 h-3 mr-1" />
                   Power-ups Active
                 </Badge>
               )}
               {settings.allowEarlySubmit && (
-                <Badge className="bg-gradient-to-r from-blue-400 to-cyan-500 text-white border-0">
+                <Badge className="bg-secondary text-secondary-foreground border-0">
                   <FastForward className="w-3 h-3 mr-1" />
                   Quick Submit
                 </Badge>
               )}
               {settings.enableAchievements && (
-                <Badge className="bg-gradient-to-r from-purple-400 to-pink-500 text-white border-0">
+                <Badge className="bg-primary text-primary-foreground border-0">
                   <Star className="w-3 h-3 mr-1" />
                   Achievements
                 </Badge>
@@ -1489,7 +1485,7 @@ export default function Game() {
       {showRoundTransition && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="glass-panel p-8 text-center animate-scale-in">
-            <h2 className="text-4xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent mb-4">
+            <h2 className="text-4xl font-bold text-primary mb-4">
               {transitionText}
             </h2>
             <div className="w-16 h-16 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -1527,7 +1523,7 @@ export default function Game() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-4">
                   <div className="text-center">
-                    <div className="text-3xl font-bold bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-full w-16 h-16 flex items-center justify-center shadow-lg">
+                    <div className="text-3xl font-bold bg-primary text-primary-foreground rounded-full w-16 h-16 flex items-center justify-center shadow-lg">
                       {roundData.letter}
                     </div>
                     <div className="text-sm text-muted-foreground mt-1">Letter</div>
@@ -1712,8 +1708,8 @@ export default function Game() {
                       <Label className="text-sm font-bold flex items-center gap-2">
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                           isComplete 
-                            ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' 
-                            : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
+                            ? 'bg-primary text-primary-foreground' 
+                            : 'bg-muted text-muted-foreground'
                         }`}>
                           {index + 1}
                         </div>

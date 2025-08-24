@@ -121,7 +121,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   votingTime: 30,
   enablePowerUps: true,
   enableAchievements: true,
-  publicRoom: false,
+  publicRoom: true, // Default to public rooms for better lobby experience
   maxPlayers: 8,
   categoryList: "classic-1",
   autoSubmitOnTimeout: true,
@@ -232,7 +232,9 @@ export default function Game() {
   const playerName = localStorage.getItem("profileName") || "Player";
   const playerId = useMemo(() => `player_${Date.now()}_${Math.random().toString(36).slice(2)}`, []);
 
-  // Room advertising for public rooms
+  // Room advertising for public rooms - store creation time consistently
+  const roomCreationTime = useRef<string>(new Date().toISOString());
+  
   usePublicRoomAdvertiser({
     enabled: isMultiplayer && (roomCreatorId === playerId) && settings.publicRoom,
     roomCode: roomCode || "",
@@ -240,7 +242,7 @@ export default function Game() {
       name: `${playerName}'s Room`,
       hostName: playerName,
       maxPlayers: settings.maxPlayers,
-      createdAtISO: new Date().toISOString(),
+      createdAtISO: roomCreationTime.current,
     },
     players: players.length,
     inMatch: gamePhase !== "lobby",
@@ -567,12 +569,23 @@ export default function Game() {
       return;
     }
     
-    // Check if players are ready (host doesn't need to be ready)
-    const readyPlayers = players.filter(p => p.isReady || p.isHost);
-    if (readyPlayers.length < 1) {
+    // Check if we have at least one player (including host)
+    if (players.length < 1) {
       toast({
         title: "Cannot start",
-        description: "At least one player must be ready to start."
+        description: "Need at least one player to start the game."
+      });
+      return;
+    }
+
+    // Check if players are ready (host can start without being ready, but at least one other player should be ready if present)
+    const nonHostPlayers = players.filter(p => !p.isHost);
+    const readyNonHostPlayers = nonHostPlayers.filter(p => p.isReady);
+    
+    if (nonHostPlayers.length > 0 && readyNonHostPlayers.length === 0) {
+      toast({
+        title: "Players not ready",
+        description: "Wait for players to be ready before starting."
       });
       return;
     }

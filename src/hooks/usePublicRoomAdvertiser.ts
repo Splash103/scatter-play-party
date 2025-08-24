@@ -36,25 +36,30 @@ export function usePublicRoomAdvertiser({ enabled, roomCode, payload, players, i
     channel.subscribe(async (status) => {
       if (status !== "SUBSCRIBED") return;
       console.log(`[Room Advertiser] Subscribed to public_rooms channel for room ${roomCode}`);
-      try {
-        await channel.track({
-          roomCode,
-          name: payload.name,
-          hostName: payload.hostName,
-          maxPlayers: payload.maxPlayers ?? 8,
-          createdAtISO: payload.createdAtISO,
-          players,
-          inMatch,
-          updatedAtISO: new Date().toISOString(),
-        });
-        console.log(`[Room Advertiser] Tracking room ${roomCode} with ${players} players`);
-      } catch (error) {
-        console.error(`[Room Advertiser] Failed to track room ${roomCode}:`, error);
-      }
+      
+      // Small delay to ensure presence state is properly initialized
+      setTimeout(async () => {
+        try {
+          await channel.track({
+            roomCode,
+            name: payload.name,
+            hostName: payload.hostName,
+            maxPlayers: payload.maxPlayers ?? 8,
+            createdAtISO: payload.createdAtISO,
+            players,
+            inMatch,
+            updatedAtISO: new Date().toISOString(),
+          });
+          console.log(`[Room Advertiser] Successfully tracking room ${roomCode} with ${players} players`);
+        } catch (error) {
+          console.error(`[Room Advertiser] Failed to track room ${roomCode}:`, error);
+        }
+      }, 100);
     });
 
     return () => {
       if (channelRef.current) {
+        console.log(`[Room Advertiser] Cleaning up room ${roomCode} advertising`);
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }

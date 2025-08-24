@@ -30,7 +30,10 @@ const Index = () => {
 
   const createRoom = () => {
     const code = generateRoomCode();
-    toast({ title: "Room created", description: `Share code ${code} to invite friends.` });
+    toast({ 
+      title: "Room created", 
+      description: `Share code ${code} to invite friends. Your room is public by default.` 
+    });
     navigate(`/game?room=${code}`);
   };
 

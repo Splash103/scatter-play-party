@@ -46,20 +46,30 @@ export function usePublicRoomsList() {
 
     channel
       .on("presence", { event: "sync" }, () => {
+        console.log('[Public Rooms] Presence sync event triggered');
         syncNow();
       })
-      .on("presence", { event: "join" }, () => {
+      .on("presence", { event: "join" }, (payload) => {
+        console.log('[Public Rooms] Presence join event triggered', payload);
         syncNow();
       })
-      .on("presence", { event: "leave" }, () => {
+      .on("presence", { event: "leave" }, (payload) => {
+        console.log('[Public Rooms] Presence leave event triggered', payload);
         syncNow();
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[Public Rooms] Channel subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          // Sync immediately when subscribed
+          setTimeout(syncNow, 50);
+        }
+      });
 
     // Initial sync in case there are already users
-    setTimeout(syncNow, 0);
+    setTimeout(syncNow, 100);
 
     return () => {
+      console.log('[Public Rooms] Cleaning up public rooms listener');
       if (channelRef.current) supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     };

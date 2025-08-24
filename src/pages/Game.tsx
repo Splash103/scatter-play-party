@@ -208,7 +208,6 @@ export default function Game() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [votes, setVotes] = useState<Record<string, string[]>>({});
   const [results, setResults] = useState<Record<string, any>>({});
-  const [allPlayersAnswers, setAllPlayersAnswers] = useState<Record<string, any>>({});
   const [finalSummary, setFinalSummary] = useState<FinalSummary | null>(null);
   const [resultsOpen, setResultsOpen] = useState(false);
   const [showRoundTransition, setShowRoundTransition] = useState(false);
@@ -406,12 +405,6 @@ export default function Game() {
         }));
         playVote();
       })
-      .on("broadcast", { event: "player_answers" }, ({ payload }) => {
-        setAllPlayersAnswers(prev => ({
-          ...prev,
-          [payload.playerId]: payload
-        }));
-      })
       .on("broadcast", { event: "round_results" }, ({ payload }) => {
         setResults(payload.results);
         setVotes(payload.votes || {});
@@ -445,8 +438,6 @@ export default function Game() {
         // Auto-submit all players' current answers
         if (roundData && !roundData.submitted) {
           setRoundData(prev => prev ? { ...prev, submitted: true } : null);
-          // Broadcast this player's answers when auto-submitted
-          broadcastPlayerAnswers();
           toast({ 
             title: "Round Auto-Submitted", 
             description: "All answers were automatically submitted!" 
@@ -461,7 +452,6 @@ export default function Game() {
         setFinalSummary(null);
         setResults({});
         setVotes({});
-        setAllPlayersAnswers({});
         setShowResults(false);
         setPlayers(prev => prev.map(p => ({ ...p, score: 0, isReady: false })));
       })
@@ -716,37 +706,8 @@ export default function Game() {
     endRound();
   };
 
-  const broadcastPlayerAnswers = () => {
-    if (!isMultiplayer || !channelRef.current || !roundData) return;
-    
-    const playerAnswers = {
-      playerId,
-      name: playerName,
-      letter: roundData.letter,
-      answers: roundData.answers || {}
-    };
-    
-    channelRef.current.send({
-      type: "broadcast",
-      event: "player_answers",
-      payload: playerAnswers
-    });
-    
-    // Also store locally
-    setAllPlayersAnswers(prev => ({
-      ...prev,
-      [playerId]: playerAnswers
-    }));
-  };
-
   const submitEarly = () => {
     if (!canSubmitEarly || !roundData) return;
-    
-    // Mark as submitted for this player first
-    setRoundData(prev => prev ? { ...prev, submitted: true } : null);
-    
-    // Broadcast this player's answers
-    broadcastPlayerAnswers();
     
     const newCount = earlySubmitCount + 1;
     setEarlySubmitCount(newCount);
@@ -760,12 +721,15 @@ export default function Game() {
       broadcastGameState({ earlySubmitCount: newCount });
     }
     
+    // Mark as submitted for this player
+    setRoundData(prev => prev ? { ...prev, submitted: true } : null);
+    
     // If host submits early, force all players to submit immediately
     if (isHost) {
       if (settings.autoSubmitOnEarlySubmit) {
-        setTimeout(() => autoSubmitAllPlayers(), 100); // Small delay to ensure answers are broadcast first
+        autoSubmitAllPlayers();
       }
-      setTimeout(() => endRound(), 200);
+      endRound();
     } else {
       // Non-host players can submit early individually
       const totalPlayers = isMultiplayer ? players.length : 1;
@@ -774,26 +738,38 @@ export default function Game() {
       if (newCount >= threshold) {
         // Majority submitted early, auto-submit and end the round
         if (settings.autoSubmitOnEarlySubmit) {
-          setTimeout(() => autoSubmitAllPlayers(), 100);
+          autoSubmitAllPlayers();
         }
-        // Only host can end the round
-        if (isHost) {
-          setTimeout(() => endRound(), 200);
-        }
+        endRound();
       }
     }
   };
 
   const autoSubmitAllPlayers = () => {
-    // Force all players to broadcast their current answers
-    broadcastPlayerAnswers();
-    
     if (isMultiplayer) {
       channelRef.current?.send({
         type: "broadcast",
         event: "auto_submit_all",
         payload: { hostId: playerId }
       });
+    }
+    
+    // Collect all current answers (even if incomplete)
+    if (roundData) {
+      const allResults: Record<string, any> = {};
+      
+      // Add current player's answers
+      allResults[playerId] = {
+        playerId,
+        name: playerName,
+        letter: roundData.letter,
+        answers: roundData.answers
+      };
+      
+      // In solo mode, set results immediately
+      if (!isMultiplayer) {
+        setResults(allResults);
+      }
     }
   };
 
@@ -803,65 +779,59 @@ export default function Game() {
       timerRef.current = null;
     }
 
-    // Ensure all players broadcast their answers before ending
-    broadcastPlayerAnswers();
-
     setShowResults(true);
     setGamePhase("results");
-    setVotingTimeLeft(settings.votingTime);
+    setVotingTimeLeft(settings.votingTime); // Use configured voting time
     
-    // Wait a moment for all player answers to be received, then collect results
-    setTimeout(() => {
-      const roundResults: Record<string, any> = {};
-      
-      if (isMultiplayer) {
-        // Use collected answers from all players
-        players.forEach(player => {
-          const playerAnswers = allPlayersAnswers[player.id];
-          roundResults[player.id] = {
-            playerId: player.id,
-            name: player.name,
-            letter: roundData?.letter || null,
-            answers: playerAnswers?.answers || {}
-          };
-        });
-        
-        if (isHost) {
-          // Host broadcasts results to all players
-          channelRef.current?.send({
-            type: "broadcast",
-            event: "round_results",
-            payload: { results: roundResults, votes: votes }
-          });
-        }
-      } else {
-        // Solo game - just add current player's results
-        roundResults[playerId] = {
-          playerId,
-          name: playerName,
+    // Collect results from all players
+    const roundResults: Record<string, any> = {};
+    
+    if (isMultiplayer) {
+      // For multiplayer, collect all players' answers
+      players.forEach(player => {
+        roundResults[player.id] = {
+          playerId: player.id,
+          name: player.name,
           letter: roundData?.letter || null,
-          answers: roundData?.answers || {}
+          answers: player.id === playerId ? (roundData?.answers || {}) : {}
         };
+      });
+      
+      if (isHost) {
+        // Host broadcasts results to all players
+        channelRef.current?.send({
+          type: "broadcast",
+          event: "round_results",
+          payload: { results: roundResults, votes: votes }
+        });
       }
+    } else {
+      // Solo game - just add current player's results
+      roundResults[playerId] = {
+        playerId,
+        name: playerName,
+        letter: roundData?.letter || null,
+        answers: roundData?.answers || {}
+      };
+    }
+    
+    setResults(roundResults);
+    setResultsOpen(true);
+    
+    // Schedule round progression or game end
+    setTimeout(() => {
+      setResultsOpen(false);
       
-      setResults(roundResults);
-      setResultsOpen(true);
-      
-      // Schedule round progression or game end
-      setTimeout(() => {
-        setResultsOpen(false);
-        
-        // Check if game should end (currentRound is 0-indexed, so check >= maxRounds - 1)
-        if (currentRound >= settings.maxRounds - 1) {
-          endGame();
-        } else {
-          // Move to next round
-          if (isHost || !isMultiplayer) {
-            nextRound();
-          }
+      // Check if game should end (currentRound is 0-indexed, so check >= maxRounds - 1)
+      if (currentRound >= settings.maxRounds - 1) {
+        endGame();
+      } else {
+        // Move to next round
+        if (isHost || !isMultiplayer) {
+          nextRound();
         }
-      }, settings.votingTime * 1000); // Wait for voting to complete
-    }, 300); // Give time for answers to be broadcast and received
+      }
+    }, settings.votingTime * 1000); // Wait for voting to complete
   };
 
   const showRoundResults = () => {
@@ -970,7 +940,6 @@ export default function Game() {
     setVotingTimeLeft(0);
     setResults({});
     setVotes({});
-    setAllPlayersAnswers({});
     startNewRound();
   };
 
@@ -1026,7 +995,6 @@ export default function Game() {
     setRoundData(null);
     setResults({});
     setVotes({});
-    setAllPlayersAnswers({});
     setShowResults(false);
     setResultsOpen(false);
     setEarlySubmitCount(0);
@@ -1283,198 +1251,111 @@ export default function Game() {
   const renderLobby = () => (
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2 space-y-6">
-        {/* Enhanced Room Info with gradient header */}
-        <Card className="glass-panel border overflow-hidden">
-          <div className="h-2 bg-primary"></div>
+        {/* Room Info */}
+        <Card className="glass-panel border">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary text-primary-foreground shadow-lg">
-                    {isMultiplayer ? <Users className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-                  </div>
-                  <div>
-                    <div className="text-xl font-bold text-primary">
-                      {isMultiplayer ? `Room ${roomCode}` : "Solo Adventure"}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {isMultiplayer ? `${players.length}/${settings.maxPlayers} warriors assembled` : "Master your skills"}
-                    </p>
-                  </div>
+                <CardTitle className="flex items-center gap-2">
+                  {isMultiplayer ? <Users className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                  {isMultiplayer ? `Room ${roomCode}` : "Solo Game"}
                 </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {isMultiplayer ? `${players.length}/${settings.maxPlayers} players` : "Practice mode"}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 {isMultiplayer && (
-                    <Button variant="outline" size="sm" onClick={copyRoomCode} className="transition-transform hover:scale-105">
-                      {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                    {copied ? "Copied!" : "Share"}
+                  <Button variant="outline" size="sm" onClick={copyRoomCode} className="glass-card">
+                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   </Button>
                 )}
                 {(isHost || (!isMultiplayer) || (roomCreatorId === playerId)) && (
-                  <Button variant="outline" size="sm" onClick={() => setShowSettings(true)} className="transition-transform hover:scale-105">
+                  <Button variant="outline" size="sm" onClick={() => setShowSettings(true)} className="glass-card">
                     <Settings className="w-4 h-4" />
-                    Settings
                   </Button>
                 )}
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            {/* Enhanced Players List */}
+            {/* Players List */}
             <div className="space-y-3">
-              {players.map((player, index) => (
-                <div key={player.id} className="group relative p-4 rounded-xl border hover:shadow-md transition-all duration-200 animate-fade-in" style={{animationDelay: `${index * 100}ms`}}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="relative">
-                        <Avatar className="w-12 h-12 ring-2 ring-white/20 shadow-lg">
-                          <AvatarFallback style={{ backgroundImage: gradientFromString(player.name), color: "white" }} className="text-lg font-bold">
-                            {initialsFromName(player.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        {player.isHost && (
-                          <div className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-1 animate-pulse">
-                            <Crown className="w-3 h-3 text-white" />
-                          </div>
+              {players.map(player => (
+                <div key={player.id} className="flex items-center justify-between p-3 rounded-lg glass-card border">
+                  <div className="flex items-center gap-3">
+                    <Avatar>
+                      <AvatarFallback style={{ backgroundImage: gradientFromString(player.name), color: "white" }}>
+                        {initialsFromName(player.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{player.name}</span>
+                        {player.isHost && <Crown className="w-4 h-4 text-yellow-500" />}
+                        {player.streak && player.streak > 0 && (
+                          <Badge variant="secondary" className="text-xs">
+                            <Flame className="w-3 h-3 mr-1" />
+                            {player.streak}
+                          </Badge>
                         )}
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-lg">{player.name}</span>
-                          {player.streak && player.streak > 0 && (
-                            <Badge variant="destructive" className="border-0">
-                              <Flame className="w-3 h-3 mr-1" />
-                              {player.streak} streak!
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Trophy className="w-3 h-3" />
-                            <span className="font-medium">{player.score || 0} points</span>
-                          </div>
-                          {player.achievements && player.achievements.length > 0 && (
-                            <div className="flex items-center gap-1">
-                              <Star className="w-3 h-3 text-yellow-500" />
-                              <span>{player.achievements.length} achievements</span>
-                            </div>
-                          )}
-                        </div>
+                      <div className="text-sm text-muted-foreground">
+                        Score: {player.score || 0}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      {isMultiplayer && (
-                        <Badge 
-                          variant={player.isReady ? "default" : "secondary"}
-                          className={`transition-all duration-300 ${
-                            player.isReady 
-                              ? "bg-primary text-primary-foreground" 
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          <div className="flex items-center gap-1">
-                            {player.isReady ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                            {player.isReady ? "Ready!" : "Waiting"}
-                          </div>
-                        </Badge>
-                      )}
-                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isMultiplayer && (
+                      <Badge variant={player.isReady ? "default" : "secondary"}>
+                        {player.isReady ? "Ready" : "Not Ready"}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Enhanced Ready/Start Controls */}
-            <div className="mt-8 flex items-center justify-center">
+            {/* Ready/Start Controls */}
+            <div className="mt-6 flex items-center justify-between">
               {isMultiplayer && !isHost && (
-                <Button 
-                  onClick={toggleReady} 
-                  variant={currentPlayer?.isReady ? "secondary" : "default"} 
-                  className="transition-colors hover:scale-105"
-                >
-                  {currentPlayer?.isReady ? (
-                    <>
-                      <StopCircle className="w-5 h-5 mr-2" />
-                      Cancel Ready
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-5 h-5 mr-2" />
-                      Ready to Battle!
-                    </>
-                  )}
+                <Button onClick={toggleReady} variant={currentPlayer?.isReady ? "secondary" : "default"} className="glass-card">
+                  {currentPlayer?.isReady ? "Not Ready" : "Ready Up"}
                 </Button>
               )}
               {((!isMultiplayer && isHost) || (isMultiplayer && roomCreatorId === playerId)) && (
-                <Button 
-                  onClick={startMatch} 
-                  className="px-12 py-4 text-xl font-bold transition-all duration-300"
-                >
-                  <Play className="w-6 h-6 mr-3" />
-                  Begin Adventure!
-                  <Sparkles className="w-6 h-6 ml-3" />
+                <Button onClick={startMatch} className="glass-card hover:scale-105">
+                  <Play className="w-4 h-4 mr-2" />
+                  Start Match
                 </Button>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Enhanced Game Preview */}
-        <Card className="glass-panel border overflow-hidden">
-          <div className="h-1 bg-secondary"></div>
+        {/* Game Preview */}
+        <Card className="glass-panel border">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="w-5 h-5 text-blue-500" />
-              Battle Configuration
-            </CardTitle>
+            <CardTitle>Game Settings</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Timer className="w-3 h-3" />
-                  Battle Duration
-                </div>
-                <div className="text-lg font-bold text-blue-600">{settings.roundTime}s per round</div>
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Trophy className="w-3 h-3" />
-                  Total Rounds
-                </div>
-                <div className="text-lg font-bold text-purple-600">{settings.maxRounds} battles</div>
-              </div>
-              <div className="space-y-1 col-span-2">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Sparkles className="w-3 h-3" />
-                  Category Pack
-                </div>
-                <div className="text-lg font-bold text-green-600">
-                  {CATEGORY_LISTS.find(l => l.id === settings.categoryList)?.name || "Random Mix"}
-                </div>
-              </div>
+          <CardContent className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="text-muted-foreground">Round Time:</span>
+              <span className="ml-2 font-medium">{settings.roundTime}s</span>
             </div>
-            
-            {/* Feature indicators */}
-            <div className="mt-4 flex flex-wrap gap-2">
-              {settings.enablePowerUps && (
-                <Badge className="bg-accent text-accent-foreground border-0">
-                  <Zap className="w-3 h-3 mr-1" />
-                  Power-ups Active
-                </Badge>
-              )}
-              {settings.allowEarlySubmit && (
-                <Badge className="bg-secondary text-secondary-foreground border-0">
-                  <FastForward className="w-3 h-3 mr-1" />
-                  Quick Submit
-                </Badge>
-              )}
-              {settings.enableAchievements && (
-                <Badge className="bg-primary text-primary-foreground border-0">
-                  <Star className="w-3 h-3 mr-1" />
-                  Achievements
-                </Badge>
-              )}
+            <div>
+              <span className="text-muted-foreground">Max Rounds:</span>
+              <span className="ml-2 font-medium">{settings.maxRounds}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Category List:</span>
+              <span className="ml-2 font-medium">
+                {CATEGORY_LISTS.find(l => l.id === settings.categoryList)?.name || "Random"}
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Power-ups:</span>
+              <span className="ml-2 font-medium">{settings.enablePowerUps ? "Enabled" : "Disabled"}</span>
             </div>
           </CardContent>
         </Card>
@@ -1485,7 +1366,7 @@ export default function Game() {
       {showRoundTransition && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="glass-panel p-8 text-center animate-scale-in">
-            <h2 className="text-4xl font-bold text-primary mb-4">
+            <h2 className="text-4xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent mb-4">
               {transitionText}
             </h2>
             <div className="w-16 h-16 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -1523,7 +1404,7 @@ export default function Game() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-4">
                   <div className="text-center">
-                    <div className="text-3xl font-bold bg-primary text-primary-foreground rounded-full w-16 h-16 flex items-center justify-center shadow-lg">
+                    <div className="text-3xl font-bold bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-full w-16 h-16 flex items-center justify-center shadow-lg">
                       {roundData.letter}
                     </div>
                     <div className="text-sm text-muted-foreground mt-1">Letter</div>
@@ -1614,149 +1495,69 @@ export default function Game() {
 
           {/* Power-ups */}
           {settings.enablePowerUps && currentPlayer?.powerUps && (
-            <Card className="border">
+            <Card className="glass-panel border">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <div className="p-2 bg-primary rounded-lg">
-                    <Zap className="w-5 h-5 text-primary-foreground" />
-                  </div>
-                  <span className="font-semibold">
-                    Power-ups
-                  </span>
+                  <Zap className="w-5 h-5 text-yellow-500" />
+                  Power-ups
                 </CardTitle>
-                <p className="text-sm text-muted-foreground">Use special abilities to gain an advantage</p>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {currentPlayer.powerUps.map((powerUp, index) => {
-                    const isActive = activePowerUps.has(powerUp.id);
-                    const isAvailable = powerUp.uses < powerUp.maxUses;
-                    const remaining = powerUp.maxUses - powerUp.uses;
-                    
-                    return (
-                      <div key={powerUp.id} className="group">
-                        <Button
-                          variant="outline"
-                          onClick={() => usePowerUp(powerUp.id)}
-                          disabled={!isAvailable || isActive}
-                          className={`w-full p-4 h-auto transition-colors ${
-                            isActive 
-                              ? 'bg-primary/10 border-primary' 
-                              : isAvailable 
-                                ? 'hover:bg-muted' 
-                                : 'opacity-50 cursor-not-allowed'
-                          }`}
-                        >
-                          <div className="flex flex-col items-center gap-2 w-full">
-                            <div className={`p-2 rounded-lg ${
-                              isAvailable ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground text-muted'
-                            }`}>
-                              {powerUp.type === "time_freeze" && <Timer className="w-5 h-5" />}
-                              {powerUp.type === "double_points" && <Star className="w-5 h-5" />}
-                              {powerUp.type === "peek" && <Eye className="w-5 h-5" />}
-                              {powerUp.type === "shield" && <Shield className="w-5 h-5" />}
-                              {powerUp.type === "lightning" && <Zap className="w-5 h-5" />}
-                            </div>
-                            
-                            <div className="text-center">
-                              <div className="font-semibold text-sm">{powerUp.name}</div>
-                              <div className="text-xs text-muted-foreground line-clamp-2">
-                                {powerUp.description}
-                              </div>
-                            </div>
-                            
-                            <Badge 
-                              variant={remaining > 0 ? "default" : "secondary"}
-                              className="text-xs"
-                            >
-                              {remaining > 0 ? `${remaining} uses` : 'Depleted'}
-                            </Badge>
-                          </div>
-                        </Button>
+                <div className="flex gap-2 flex-wrap">
+                  {currentPlayer.powerUps.map(powerUp => (
+                    <Button
+                      key={powerUp.id}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => usePowerUp(powerUp.id)}
+                      disabled={powerUp.uses >= powerUp.maxUses || activePowerUps.has(powerUp.id)}
+                      className={`glass-card ${activePowerUps.has(powerUp.id) ? 'animate-pulse bg-yellow-100' : ''}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {powerUp.type === "time_freeze" && <Timer className="w-4 h-4" />}
+                        {powerUp.type === "double_points" && <Star className="w-4 h-4" />}
+                        {powerUp.type === "peek" && <Eye className="w-4 h-4" />}
+                        {powerUp.type === "shield" && <Shield className="w-4 h-4" />}
+                        {powerUp.type === "lightning" && <Zap className="w-4 h-4" />}
+                        <span>{powerUp.name}</span>
+                        <Badge variant="secondary" className="text-xs">
+                          {powerUp.maxUses - powerUp.uses}
+                        </Badge>
                       </div>
-                    );
-                  })}
+                    </Button>
+                  ))}
                 </div>
               </CardContent>
             </Card>
           )}
 
           {/* Categories */}
-          <Card className="border">
+          <Card className="glass-panel border">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-primary" />
-                  Categories
-                </CardTitle>
-                {roundData.submitted && (
-                  <Badge variant="secondary">
-                    <CheckCircle2 className="w-4 h-4 mr-1" />
-                    Submitted
-                  </Badge>
-                )}
-              </div>
+              <CardTitle>Categories</CardTitle>
+              {roundData.submitted && (
+                <Badge variant="secondary" className="w-fit">
+                  <CheckCircle2 className="w-4 h-4 mr-1" />
+                  Submitted
+                </Badge>
+              )}
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {roundData.categories.map((category, index) => {
-                  const hasAnswer = roundData.answers[index]?.trim();
-                  const isComplete = hasAnswer && hasAnswer.toLowerCase().startsWith(roundData.letter.toLowerCase());
-                  
-                  return (
-                    <div key={index} className="group space-y-3">
-                      <Label className="text-sm font-bold flex items-center gap-2">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                          isComplete 
-                            ? 'bg-primary text-primary-foreground' 
-                            : 'bg-muted text-muted-foreground'
-                        }`}>
-                          {index + 1}
-                        </div>
-                        {category}
-                      </Label>
-                      <div className="relative">
-                        <Input
-                          value={roundData.answers[index] || ""}
-                          onChange={(e) => updateAnswer(index, e.target.value)}
-                          placeholder={`${roundData.letter}...`}
-                          disabled={roundData.submitted || isPaused}
-                          className={`transition-colors ${
-                            isComplete 
-                              ? 'border-green-500 bg-green-50 dark:bg-green-950/20' 
-                              : hasAnswer 
-                                ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20' 
-                                : ''
-                          }`}
-                        />
-                        {isComplete && (
-                          <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                            <CheckCircle2 className="w-4 h-4 text-green-500" />
-                          </div>
-                        )}
-                        {hasAnswer && !isComplete && (
-                          <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                            <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              
-              {/* Progress indicator */}
-              <div className="mt-6 p-4 bg-muted/30 rounded-lg border">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Progress</span>
-                  <span className="text-sm font-semibold">
-                    {Object.values(roundData.answers).filter(a => a?.trim()).length}/{roundData.categories.length}
-                  </span>
-                </div>
-                <Progress 
-                  value={(Object.values(roundData.answers).filter(a => a?.trim()).length / roundData.categories.length) * 100}
-                  className="h-2"
-                />
+              <div className="grid gap-4 sm:grid-cols-2">
+                {roundData.categories.map((category, index) => (
+                  <div key={index} className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      {index + 1}. {category}
+                    </Label>
+                    <Input
+                      value={roundData.answers[index] || ""}
+                      onChange={(e) => updateAnswer(index, e.target.value)}
+                      placeholder={`${roundData.letter}...`}
+                      disabled={roundData.submitted || isPaused}
+                      className="glass-card"
+                    />
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -1765,7 +1566,7 @@ export default function Game() {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Players Status */}
-          <Card className="border">
+          <Card className="glass-panel border">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="w-5 h-5" />

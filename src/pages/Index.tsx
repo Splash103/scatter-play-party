@@ -52,51 +52,65 @@ const Index = () => {
         <meta name="description" content="Play Scattergories online with modern UI. Create or join rooms to play with friends, or start a solo round instantly." />
         <link rel="canonical" href="/" />
       </Helmet>
-      <div className="min-h-screen bg-background">
-        <div className="container mx-auto p-6">
-          <header className="text-center mb-12">
-            <h1 className="text-4xl font-bold mb-4">Scattergories Online</h1>
-            <p className="text-xl text-muted-foreground">The classic game with modern design</p>
+      <div className="relative min-h-screen flex items-center justify-center card-game-bg overflow-hidden">
+        <Aurora />
+        <Particles />
+        <div className="relative z-10 w-full max-w-6xl mx-auto p-6 sm:p-10 rounded-2xl glass-panel">
+          <div className="absolute right-6 top-6 flex items-center gap-3">
+            <Button variant="secondary" size="icon" aria-label="Toggle theme" onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')} className="glass-card hover:scale-105">
+              {resolvedTheme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <Button asChild variant="outline" size="sm" aria-label="Sign in or manage account" className="glass-card hover:scale-105">
+              <Link to="/auth">Account</Link>
+            </Button>
+          </div>
+          <header className="text-center mb-12 mt-8">
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-normal text-black dark:text-white mb-4">
+              Scattergories Online
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
+              The classic game, but it looks better
+            </p>
           </header>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto">
-            <Card className="group cursor-pointer transition-all hover:shadow-lg">
+          <main className="grid gap-8 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 mb-8">
+            <Card className="glass-card floating-card group cursor-pointer" style={{ animationDelay: '0s' }}>
               <CardHeader className="text-center pb-4">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <Gamepad2 className="text-primary-foreground w-8 h-8" />
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Gamepad2 className="text-white w-8 h-8" />
                 </div>
                 <CardTitle className="text-xl">Quick Play</CardTitle>
-                <CardDescription>Jump into a game instantly</CardDescription>
+                <CardDescription className="text-sm opacity-80">Jump into a game instantly</CardDescription>
               </CardHeader>
               <CardFooter>
-                <Button onClick={() => setPlayOpen(true)} className="w-full">
+                <Button onClick={() => setPlayOpen(true)} aria-label="Open play options" className="w-full glass-card hover:scale-105">
                   Start Playing
                 </Button>
               </CardFooter>
             </Card>
 
-            <Card className="group cursor-pointer transition-all hover:shadow-lg">
+            <Card className="glass-card floating-card group cursor-pointer" style={{ animationDelay: '0.2s' }}>
               <CardHeader className="text-center pb-4">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-secondary flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <Users className="text-secondary-foreground w-8 h-8" />
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Users className="text-white w-8 h-8" />
                 </div>
                 <CardTitle className="text-xl">Game Lobby</CardTitle>
-                <CardDescription>Join active multiplayer rooms</CardDescription>
+                <CardDescription className="text-sm opacity-80">Join active multiplayer rooms</CardDescription>
               </CardHeader>
               <CardFooter>
-                <Button asChild variant="secondary" className="w-full">
+                <Button asChild aria-label="Open lobby" className="w-full glass-card hover:scale-105">
                   <Link to="/lobby">Browse Rooms</Link>
                 </Button>
               </CardFooter>
             </Card>
 
-            <Card className="group cursor-pointer transition-all hover:shadow-lg">
+            <Card className="glass-card floating-card group cursor-pointer" style={{ animationDelay: '0.4s' }}>
               <CardHeader className="text-center pb-4">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-accent flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <UserCircle2 className="text-accent-foreground w-8 h-8" />
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <UserCircle2 className="text-white w-8 h-8" />
                 </div>
                 <CardTitle className="text-xl">Player Profile</CardTitle>
-                <CardDescription>Customize your gaming identity</CardDescription>
+                <CardDescription className="text-sm opacity-80">Customize your gaming identity</CardDescription>
               </CardHeader>
               <CardContent className="flex items-center justify-center gap-3 py-4">
                 <Avatar>
@@ -113,59 +127,48 @@ const Index = () => {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button variant="outline" onClick={() => setProfileOpen(true)} className="w-full">
+                <Button variant="secondary" onClick={() => setProfileOpen(true)} aria-label="Edit profile" className="w-full glass-card hover:scale-105">
                   {name ? "Edit Profile" : "Set Name"}
                 </Button>
               </CardFooter>
             </Card>
 
-            <Card className="group cursor-pointer transition-all hover:shadow-lg">
+            <Card className="glass-card floating-card group cursor-pointer" style={{ animationDelay: '0.6s' }}>
               <CardHeader className="text-center pb-4">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-muted flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <Trophy className="text-muted-foreground w-8 h-8" />
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-yellow-500 to-orange-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Trophy className="text-white w-8 h-8" />
                 </div>
                 <CardTitle className="text-xl">Champions</CardTitle>
-                <CardDescription>View top players and stats</CardDescription>
+                <CardDescription className="text-sm opacity-80">View top players and stats</CardDescription>
               </CardHeader>
               <CardFooter>
-                <Button asChild variant="outline" className="w-full">
+                <Button asChild aria-label="Open leaderboard" className="w-full glass-card hover:scale-105">
                   <Link to="/leaderboard">View Rankings</Link>
                 </Button>
               </CardFooter>
             </Card>
-          </div>
-
-          <div className="absolute right-6 top-6 flex items-center gap-3">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-            >
-              {resolvedTheme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/auth">Account</Link>
-            </Button>
-          </div>
+          </main>
 
           <Dialog open={playOpen} onOpenChange={setPlayOpen}>
-            <DialogContent>
+            <DialogContent className="glass-panel border-0">
               <DialogHeader>
                 <DialogTitle className="text-2xl text-center mb-4">Choose Your Adventure</DialogTitle>
-                <DialogDescription className="text-center">Choose your game mode and start playing immediately</DialogDescription>
+                <DialogDescription className="text-center text-muted-foreground">Choose your game mode and start playing immediately</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Button 
                   variant="secondary" 
                   onClick={() => { setPlayOpen(false); navigate('/game'); }} 
-                  className="h-16 text-lg"
+                  aria-label="Start solo"
+                  className="glass-card hover:scale-105 h-16 text-lg"
                 >
                   <Gamepad2 className="mr-3 h-5 w-5" />
                   Solo Play
                 </Button>
                 <Button 
                   onClick={() => { setPlayOpen(false); createRoom(); }} 
-                  className="h-16 text-lg"
+                  aria-label="Create room"
+                  className="glass-card hover:scale-105 h-16 text-lg"
                 >
                   <PlusCircle className="mr-3 h-5 w-5" />
                   Create Room
@@ -175,13 +178,13 @@ const Index = () => {
           </Dialog>
 
           <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
-            <DialogContent>
+            <DialogContent className="glass-panel border-0">
               <DialogHeader>
                 <DialogTitle className="text-2xl text-center mb-6">Player Profile</DialogTitle>
-                <DialogDescription className="text-center">Customize your player name and gaming identity</DialogDescription>
+                <DialogDescription className="text-center text-muted-foreground">Customize your player name and gaming identity</DialogDescription>
               </DialogHeader>
               <div className="flex flex-col items-center gap-6">
-                <Avatar className="w-20 h-20">
+                <Avatar className="w-20 h-20 border-4 border-white/20">
                   <AvatarFallback
                     style={{ backgroundImage: gradientFromString(name || 'Player'), color: "white" }}
                     className="text-2xl font-bold"
@@ -194,9 +197,9 @@ const Index = () => {
                     value={name} 
                     onChange={(e) => setName(e.target.value)} 
                     placeholder="Enter your display name" 
-                    className="text-center text-lg h-12"
+                    className="glass-card text-center text-lg h-12"
                   />
-                  <Button onClick={saveProfile} className="w-full h-12 text-lg">
+                  <Button onClick={saveProfile} className="w-full glass-card hover:scale-105 h-12 text-lg">
                     Save Profile
                   </Button>
                 </div>

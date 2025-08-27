@@ -43,7 +43,7 @@ export const CATEGORY_LISTS: CategoryList[] = [
     ],
   },
   {
-    id: "party-1",
+    id: "party-1", //change list 
     name: "Party Mix",
     categories: [
       "Food toppings",
@@ -97,7 +97,7 @@ export const CATEGORY_LISTS: CategoryList[] = [
     ],
   },
   {
-    id: "nature-1",
+    id: "nature-1", //change list
     name: "Nature",
     categories: [
       "Trees",
@@ -169,7 +169,7 @@ export const CATEGORY_LISTS: CategoryList[] = [
     ],
   },
   {
-    id: "home-1",
+    id: "home-1", //change list
     name: "At Home",
     categories: [
       "Things you cook with",

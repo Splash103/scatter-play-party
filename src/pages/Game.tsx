@@ -235,8 +235,14 @@ export default function Game() {
   // Room advertising for public rooms - store creation time consistently
   const roomCreationTime = useRef<string>(new Date().toISOString());
   
+  // Only advertise when we have valid presence data (at least 1 player or confirmed empty)
+  const shouldAdvertise = isMultiplayer && 
+                         (roomCreatorId === playerId) && 
+                         settings.publicRoom &&
+                         (players.length > 0 || (channelRef.current && !!roomCreatorId));
+  
   usePublicRoomAdvertiser({
-    enabled: isMultiplayer && (roomCreatorId === playerId) && settings.publicRoom,
+    enabled: shouldAdvertise,
     roomCode: roomCode || "",
     payload: {
       name: `${playerName}'s Room`,
@@ -244,7 +250,7 @@ export default function Game() {
       maxPlayers: settings.maxPlayers,
       createdAtISO: roomCreationTime.current,
     },
-    players: players.length,
+    players: Math.max(players.length, roomCreatorId === playerId ? 1 : 0), // Ensure host counts as 1 player minimum
     inMatch: gamePhase !== "lobby",
   });
 
@@ -1302,21 +1308,22 @@ export default function Game() {
                         {initialsFromName(player.name)}
                       </AvatarFallback>
                     </Avatar>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{player.name}</span>
-                        {player.isHost && <Crown className="w-4 h-4 text-yellow-500" />}
-                        {player.streak && player.streak > 0 && (
-                          <Badge variant="secondary" className="text-xs">
-                            <Flame className="w-3 h-3 mr-1" />
-                            {player.streak}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Score: {player.score || 0}
-                      </div>
-                    </div>
+                     <div>
+                       <div className="flex items-center gap-2">
+                         <span className="font-medium">{player.name}</span>
+                         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Online"></div>
+                         {player.isHost && <Crown className="w-4 h-4 text-yellow-500" />}
+                         {player.streak && player.streak > 0 && (
+                           <Badge variant="secondary" className="text-xs">
+                             <Flame className="w-3 h-3 mr-1" />
+                             {player.streak}
+                           </Badge>
+                         )}
+                       </div>
+                       <div className="text-sm text-muted-foreground">
+                         Score: {player.score || 0}
+                       </div>
+                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {isMultiplayer && (

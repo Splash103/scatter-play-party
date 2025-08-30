@@ -20,13 +20,9 @@ export default function Leaderboard() {
   const { data, isLoading } = useQuery({
     queryKey: ["leaderboard"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("v_leaderboard")
-        .select("display_name, total_wins, current_streak, best_streak")
-        .order("total_wins", { ascending: false })
-        .limit(50);
+      const { data, error } = await supabase.rpc('get_leaderboard', { limit_count: 50 });
       if (error) throw error;
-      return (data || []).map((row, index) => ({
+      return (data || []).map((row: any, index: number) => ({
         user_id: `user_${index}`,
         name: row.display_name || 'Player',
         avatar_url: null,
